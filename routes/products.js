@@ -7,35 +7,45 @@ router.get('/', async (req, res) => {
   try {
     const query = `
       SELECT 
-        p.product_id as id,
-        p.product_title as title,
-        p.product_description as description,
-        p.product_main_img_url as image,
-        p.product_price as price,
-        p.product_rating as rating,
-        p.product_type as type,
-        p.product_created_at as createdAt,
-        p.product_updated_at as updatedAt,
-        ARRAY_AGG(DISTINCT ac.age_category_name) as ageCategories,
-        ARRAY_AGG(DISTINCT e.event_name) as events,
-        ARRAY_AGG(DISTINCT i.image_url) as additionalImages
+        p.product_id AS id,
+        p.product_title AS title,
+        p.product_description AS description,
+        p.product_main_img_url AS image,
+        p.product_price AS price,
+        p.product_rating AS rating,
+
+        pt.product_type_id AS type_id,
+        pt.product_type_name AS type,
+
+        p.product_created_at AS createdAt,
+        p.product_updated_at AS updatedAt,
+
+        ARRAY_AGG(DISTINCT ac.age_category_name) AS ageCategories,
+        ARRAY_AGG(DISTINCT e.event_name) AS events,
+        ARRAY_AGG(DISTINCT i.image_url) AS additionalImages
+
       FROM products p
+      JOIN producttypes pt ON pt.product_type_id = p.product_type_id
+
       LEFT JOIN productagecategories pac ON p.product_id = pac.product_id
       LEFT JOIN agecategories ac ON pac.age_category_id = ac.age_category_id
       LEFT JOIN productevents pe ON p.product_id = pe.product_id
       LEFT JOIN events e ON pe.event_id = e.event_id
       LEFT JOIN productimages pi ON p.product_id = pi.product_id
       LEFT JOIN images i ON pi.image_id = i.image_id
+
       GROUP BY 
-        p.product_id, 
-        p.product_title, 
-        p.product_description, 
-        p.product_main_img_url, 
-        p.product_price, 
-        p.product_rating, 
-        p.product_type,
+        p.product_id,
+        pt.product_type_id,
+        pt.product_type_name,
+        p.product_title,
+        p.product_description,
+        p.product_main_img_url,
+        p.product_price,
+        p.product_rating,
         p.product_created_at,
         p.product_updated_at
+
       ORDER BY p.product_id
     `;
 
@@ -74,34 +84,44 @@ router.get('/:id', async (req, res) => {
 
     const query = `
       SELECT 
-        p.product_id as id,
-        p.product_title as title,
-        p.product_description as description,
-        p.product_main_img_url as image,
-        p.product_price as price,
-        p.product_rating as rating,
-        p.product_type as type,
-        p.product_created_at as createdAt,
-        p.product_updated_at as updatedAt,
-        ARRAY_AGG(DISTINCT ac.age_category_name) as ageCategories,
-        ARRAY_AGG(DISTINCT e.event_name) as events,
-        ARRAY_AGG(DISTINCT i.image_url) as additionalImages
+        p.product_id AS id,
+        p.product_title AS title,
+        p.product_description AS description,
+        p.product_main_img_url AS image,
+        p.product_price AS price,
+        p.product_rating AS rating,
+
+        pt.product_type_id AS type_id,
+        pt.product_type_name AS type,
+
+        p.product_created_at AS createdAt,
+        p.product_updated_at AS updatedAt,
+
+        ARRAY_AGG(DISTINCT ac.age_category_name) AS ageCategories,
+        ARRAY_AGG(DISTINCT e.event_name) AS events,
+        ARRAY_AGG(DISTINCT i.image_url) AS additionalImages
+
       FROM products p
+      JOIN producttypes pt ON pt.product_type_id = p.product_type_id
+
       LEFT JOIN productagecategories pac ON p.product_id = pac.product_id
       LEFT JOIN agecategories ac ON pac.age_category_id = ac.age_category_id
       LEFT JOIN productevents pe ON p.product_id = pe.product_id
       LEFT JOIN events e ON pe.event_id = e.event_id
       LEFT JOIN productimages pi ON p.product_id = pi.product_id
       LEFT JOIN images i ON pi.image_id = i.image_id
+
       WHERE p.product_id = $1
+
       GROUP BY 
-        p.product_id, 
-        p.product_title, 
-        p.product_description, 
-        p.product_main_img_url, 
-        p.product_price, 
-        p.product_rating, 
-        p.product_type,
+        p.product_id,
+        pt.product_type_id,
+        pt.product_type_name,
+        p.product_title,
+        p.product_description,
+        p.product_main_img_url,
+        p.product_price,
+        p.product_rating,
         p.product_created_at,
         p.product_updated_at
     `;
