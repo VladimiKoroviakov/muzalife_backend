@@ -116,6 +116,7 @@ app.get('/api/info', (req, res) => {
       reviews: {
         getAllReviews: 'GET /api/reviews',
         getProductReviews: 'GET /api/reviews/product/:productId',
+        getUserReviews: 'GET /api/reviews/user/:userId (protected)',
         createReview: 'POST /api/reviews (protected)',
         updateReview: 'PUT /api/reviews/:id (protected)',
         deleteReview: 'DELETE /api/reviews/:id (protected)'

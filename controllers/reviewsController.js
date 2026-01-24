@@ -49,13 +49,13 @@ export const getProductReviews = async (req, res) => {
   }
 };
 
-// GET /api/reviews/:reviewId - Get a specific review by ID
-export const getReviewById = async (req, res) => {
+// GET /api/reviews/user/:userId - Get all reviews by a specific user
+export const getReviewsByUser = async (req, res) => {
   try {
-    const reviewId = parseInt(req.params.reviewId);
+    const userId = parseInt(req.params.userId);
     
-    if (isNaN(reviewId)) {
-      return res.status(400).json({ error: 'Invalid review ID' });
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
     }
 
     const query = `
@@ -75,23 +75,19 @@ export const getReviewById = async (req, res) => {
         ) as "userAvatar",
         SUBSTRING(u.user_name FROM 1 FOR 2) as "userInitials",
         pr.product_id as "productId",
-        r.review_created_at as "createdAt",
-        r.review_updated_at as "updatedAt"
+        pr.review_created_at as "createdAt"
       FROM Reviews r
       INNER JOIN ProductReviews pr ON r.review_id = pr.review_id
       INNER JOIN Users u ON pr.user_id = u.user_id
-      WHERE r.review_id = $1
+      WHERE pr.user_id = $1
+      ORDER BY pr.review_created_at DESC
     `;
 
-    const result = await pool.query(query, [reviewId]);
+    const result = await pool.query(query, [userId]);
     
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Review not found' });
-    }
-
-    res.json(result.rows[0]);
+    res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching review:', error);
+    console.error('Error fetching user reviews:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
