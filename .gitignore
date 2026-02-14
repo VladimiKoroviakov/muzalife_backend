@@ -20,3 +20,10 @@ uploads/
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+
+# Ignore log files
+logs/
+*.log   
+
+# Certificate files
+certs/
