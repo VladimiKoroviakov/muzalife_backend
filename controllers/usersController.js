@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 export const getProfile = async (req, res) => {
   try {
     const result = await query(
-      `SELECT user_id, user_email, user_name, user_avatar_url, user_auth_provider, user_created_at, is_admin 
+      `SELECT user_id, user_email, user_name, user_avatar_url, user_auth_provider, user_created_at, is_admin
        FROM Users WHERE user_id = $1`,
       [req.userId]
     );
@@ -26,7 +26,7 @@ export const getProfile = async (req, res) => {
     }
 
     const user = result.rows[0];
-    
+
     const userProfile = {
       user: {
         id: user.user_id,
@@ -38,9 +38,9 @@ export const getProfile = async (req, res) => {
         is_admin: user.is_admin
       }
     };
-    
+
     res.json(userProfile);
-    
+
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -82,7 +82,7 @@ export const updateName = async (req, res) => {
 };
 
 // ---------- Email Change Handlers ----------
-/** 
+/**
  * Initiate email change
  */
 export const initiateEmailChange = async (req, res) => {
@@ -123,7 +123,7 @@ export const initiateEmailChange = async (req, res) => {
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Цей email вже зайнятий іншим користувачем',
         code: 'EMAIL_EXISTS'
       });
@@ -155,14 +155,14 @@ export const initiateEmailChange = async (req, res) => {
     });
   } catch (error) {
     console.error('Email change initiation error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Внутрішня помилка сервера',
-      details: error.message 
-    }); 
+      details: error.message
+    });
   }
 };
 
-/** 
+/**
  * Verify email change
  */
 export const verifyEmailChange = async (req, res) => {
@@ -175,12 +175,12 @@ export const verifyEmailChange = async (req, res) => {
 
     // Verify the code
     const verificationResult = await verificationService.verifyCode(
-      newEmail, 
+      newEmail,
       verificationCode
     );
 
     if (!verificationResult.isValid) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: verificationResult.message,
         code: 'INVALID_VERIFICATION_CODE'
       });
@@ -193,7 +193,7 @@ export const verifyEmailChange = async (req, res) => {
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Користувач з таким email вже існує',
         code: 'USER_EXISTS'
       });
@@ -228,9 +228,9 @@ export const verifyEmailChange = async (req, res) => {
     });
   } catch (error) {
     console.error('Email change verification error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Внутрішня помилка сервера',
-      details: error.message 
+      details: error.message
     });
   }
 };
@@ -253,15 +253,15 @@ export const resendEmailChangeCode = async (req, res) => {
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Цей email вже зайнятий іншим користувачем',
         code: 'EMAIL_EXISTS'
       });
     }
-    
+
     // Generate new code
     const newCode = await verificationService.createVerificationCode(
-      email, 
+      email,
       'email_change'
     );
 
@@ -277,8 +277,8 @@ export const resendEmailChangeCode = async (req, res) => {
     console.error('Resend email change code error:', error);
 
     if (error.message === 'Failed to send verification email') {
-      return res.status(500).json({ 
-        error: 'Не вдалося відправити email. Спробуйте ще раз пізніше.' 
+      return res.status(500).json({
+        error: 'Не вдалося відправити email. Спробуйте ще раз пізніше.'
       });
     }
 
@@ -356,8 +356,8 @@ export const uploadProfileImage = async (req, res) => {
       [relativePath, userId]
     );
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       imageUrl: constructFullUrl(req, relativePath)
     });
   } catch (error) {
@@ -381,7 +381,7 @@ export const removeProfileImage = async (req, res) => {
 
     if (userResult.rows.length > 0 && userResult.rows[0].user_avatar_url) {
       const oldImagePath = path.join(__dirname, '..', userResult.rows[0].user_avatar_url);
-      
+
       // Delete the file if it exists
       if (fs.existsSync(oldImagePath)) {
         fs.unlinkSync(oldImagePath);
@@ -434,7 +434,7 @@ export const resendMaterial = async (req, res) => {
     // For now, we'll just return success
     // TODO: replace with proper logger — console.log(`Resending material: ${materialName} to user ${userId}`);
 
-    res.json({ 
+    res.json({
       success: true,
       message: 'Material will be sent to your email shortly'
     });

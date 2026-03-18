@@ -1,10 +1,10 @@
 import express from 'express';
-import { 
-  initiateRegistration, 
-  verifyEmailAndRegister, 
+import {
+  initiateRegistration,
+  verifyEmailAndRegister,
   resendVerificationCode,
-  login, 
-  googleAuth, 
+  login,
+  googleAuth,
   facebookAuth
 } from '../controllers/authController.js';
 

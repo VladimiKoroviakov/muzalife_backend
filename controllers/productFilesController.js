@@ -15,7 +15,7 @@ const uploadFiles = async (req, res) => {
     const fileRecords = [];
     for (const file of files) {
       const result = await query(
-        `INSERT INTO product_files (product_id, file_name, file_url, file_size) 
+        `INSERT INTO product_files (product_id, file_name, file_url, file_size)
          VALUES ($1, $2, $3, $4) RETURNING id, file_name, file_url, file_size`,
         [productId, file.originalname, file.path, file.size]
       );
@@ -36,11 +36,11 @@ const uploadFiles = async (req, res) => {
 const getProductFiles = async (req, res) => {
   try {
     const productId = req.params.productId;
-    
+
     const result = await query(
-      `SELECT id, file_name, file_url, file_size, created_at 
-       FROM product_files 
-       WHERE product_id = $1 
+      `SELECT id, file_name, file_url, file_size, created_at
+       FROM product_files
+       WHERE product_id = $1
        ORDER BY created_at DESC`,
       [productId]
     );
@@ -59,7 +59,7 @@ const getProductFiles = async (req, res) => {
 const deleteFile = async (req, res) => {
   try {
     const fileId = req.params.fileId;
-    
+
     // First get file info to delete from filesystem
     const fileResult = await query(
       'SELECT file_url FROM product_files WHERE id = $1',

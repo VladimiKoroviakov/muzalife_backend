@@ -49,7 +49,8 @@ app.use(express.json());
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Debug middleware
+// Debug middleware — intentional request logger
+// eslint-disable-next-line no-console
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
@@ -120,7 +121,7 @@ app.get('/api/info', (req, res) => {
         updateReview: 'PUT /api/reviews/:id (protected)',
         deleteReview: 'DELETE /api/reviews/:id (protected)'
       },
-      faqs: { 
+      faqs: {
         getAll: 'GET /api/faqs',
         getById: 'GET /api/faqs/:id',
         create: 'POST /api/faqs (protected)',
@@ -165,23 +166,23 @@ app.get('/api/info', (req, res) => {
 app.get('/api/test-db', async (req, res) => {
   try {
     const result = await query('SELECT NOW() as current_time');
-    res.json({ 
+    res.json({
       status: 'Database connected successfully',
-      currentTime: result.rows[0].current_time 
+      currentTime: result.rows[0].current_time
     });
   } catch (error) {
     console.error('Database connection error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Database connection failed',
-      details: error.message 
+      details: error.message
     });
   }
 });
 
 // Basic health check route
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'Muza Life Backend Server is running!',
     timestamp: new Date().toISOString(),
     version: '1.0.0'
@@ -224,7 +225,7 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use((error, req, res, next) => {
   console.error('Global error handler:', error);
-  
+
   // Handle multer file upload errors
   if (error.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
@@ -232,7 +233,7 @@ app.use((error, req, res, next) => {
       message: 'File size must be less than 50MB'
     });
   }
-  
+
   if (error.message.includes('Invalid file type')) {
     return res.status(400).json({
       error: 'Invalid file type',
@@ -246,6 +247,7 @@ app.use((error, req, res, next) => {
   });
 });
 
+/* eslint-disable no-console */
 https.createServer(sslOptions, app).listen(PORT, () => {
   console.log(`🚀 Muza Life Backend Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -264,3 +266,4 @@ https.createServer(sslOptions, app).listen(PORT, () => {
   console.log(`📍 Static files serving from: http://localhost:${PORT}/uploads/`);
   console.log('══════════════════════════════════════════════════');
 });
+/* eslint-enable no-console */

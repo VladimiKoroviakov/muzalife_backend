@@ -12,17 +12,17 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const productId = req.params.productId || 'temp';
     const dir = `${uploadsDir}products/${productId}/`;
-    
+
     // Create directory if it doesn't exist
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    
+
     cb(null, dir);
   },
   filename: (req, file, cb) => {
     // Sanitize filename and make unique
-    const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname);
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
   }
 });
@@ -43,7 +43,7 @@ const fileFilter = (req, file, cb) => {
     'image/png',
     'image/gif'
   ];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {

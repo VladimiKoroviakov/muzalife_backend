@@ -11,7 +11,7 @@ router.use(authenticateToken);
 router.get('/', async (req, res) => {
   try {
     const userId = req.userId;
-    
+
     const result = await query(`
       SELECT * FROM PersonalOrders
       WHERE user_id = $1
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
 router.get('/all', async (req, res) => {
   try {
     const userId = req.userId;
-    
+
     // Check if user is admin by querying database
     const userResult = await query(
       'SELECT is_admin FROM Users WHERE user_id = $1',
@@ -51,7 +51,7 @@ router.get('/all', async (req, res) => {
     }
 
     const user = userResult.rows[0];
-    
+
     if (!user.is_admin) {
       return res.status(403).json({
         success: false,
@@ -61,7 +61,7 @@ router.get('/all', async (req, res) => {
 
     // User is admin, fetch all orders
     const result = await query(`
-      SELECT 
+      SELECT
         po.*,
         u.name as user_name,
         u.email as user_email
@@ -88,14 +88,14 @@ router.get('/all', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const userId = req.userId;
-    const { 
-      orderTitle, 
-      orderDescription, 
-      orderStatus, 
-      orderPrice, 
-      orderMaterialType, 
+    const {
+      orderTitle,
+      orderDescription,
+      orderStatus,
+      orderPrice,
+      orderMaterialType,
       orderMaterialAgeCategory,
-      orderDeadline 
+      orderDeadline
     } = req.body;
 
     // Validate required fields
@@ -108,23 +108,23 @@ router.post('/', async (req, res) => {
 
     const result = await query(`
       INSERT INTO PersonalOrders (
-        user_id, 
-        order_title, 
-        order_description, 
-        order_status, 
-        order_price, 
-        order_material_type, 
+        user_id,
+        order_title,
+        order_description,
+        order_status,
+        order_price,
+        order_material_type,
         order_material_age_category,
         order_deadline
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [
-      userId, 
-      orderTitle, 
-      orderDescription, 
+      userId,
+      orderTitle,
+      orderDescription,
       orderStatus || 'pending',  // Default status
       orderPrice || 0,           // Default price
-      orderMaterialType, 
+      orderMaterialType,
       orderMaterialAgeCategory,
       orderDeadline || null
     ]);
@@ -163,7 +163,7 @@ router.get('/:orderId', async (req, res) => {
     }
 
     const order = orderResult.rows[0];
-    
+
     // Check if user owns the order
     if (order.user_id !== userId) {
       // User doesn't own the order, check if they're admin
@@ -171,7 +171,7 @@ router.get('/:orderId', async (req, res) => {
         'SELECT is_admin FROM Users WHERE user_id = $1',
         [userId]
       );
-      
+
       if (userResult.rows.length === 0 || !userResult.rows[0].is_admin) {
         return res.status(403).json({
           success: false,
@@ -200,14 +200,14 @@ router.put('/:orderId', async (req, res) => {
   try {
     const userId = req.userId;
     const { orderId } = req.params;
-    const { 
+    const {
       orderTitle,
       orderDescription,
-      orderStatus, 
-      orderPrice, 
-      orderMaterialType, 
+      orderStatus,
+      orderPrice,
+      orderMaterialType,
       orderMaterialAgeCategory,
-      orderDeadline 
+      orderDeadline
     } = req.body;
 
     // Check if order exists
@@ -224,15 +224,15 @@ router.put('/:orderId', async (req, res) => {
     }
 
     const orderUserId = checkOwnership.rows[0].user_id;
-    
+
     // Check if user is admin
     const userResult = await query(
       'SELECT is_admin FROM Users WHERE user_id = $1',
       [userId]
     );
-    
+
     const isAdmin = userResult.rows.length > 0 ? userResult.rows[0].is_admin : false;
-    
+
     // Only allow update if user owns the order or is admin
     if (orderUserId !== userId && !isAdmin) {
       return res.status(403).json({
@@ -283,7 +283,7 @@ router.put('/:orderId', async (req, res) => {
     }
 
     values.push(orderId);
-    
+
     const result = await query(`
       UPDATE PersonalOrders
       SET ${updates.join(', ')}
@@ -325,15 +325,15 @@ router.delete('/:orderId', async (req, res) => {
     }
 
     const orderUserId = checkOwnership.rows[0].user_id;
-    
+
     // Check if user is admin
     const userResult = await query(
       'SELECT is_admin FROM Users WHERE user_id = $1',
       [userId]
     );
-    
+
     const isAdmin = userResult.rows.length > 0 ? userResult.rows[0].is_admin : false;
-    
+
     // Only allow delete if user owns the order or is admin
     if (orderUserId !== userId && !isAdmin) {
       return res.status(403).json({

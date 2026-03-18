@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const client = new Client({
   user: process.env.DB_USER,
   host: process.env.DB_HOST,
-  database: process.env.DB_NAME, 
+  database: process.env.DB_NAME,
   password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT,
 });
@@ -29,7 +29,7 @@ const setupDatabase = async () => {
 
     // Connect to the specific database
     await client.end();
-    
+
     const dbClient = new Client({
       user: process.env.DB_USER,
       host: process.env.DB_HOST,
@@ -37,7 +37,7 @@ const setupDatabase = async () => {
       password: process.env.DB_PASSWORD,
       port: process.env.DB_PORT,
     });
-    
+
     await dbClient.connect();
 
     // Execute the complete schema from above
@@ -137,7 +137,7 @@ const setupDatabase = async () => {
             FOREIGN KEY (poll_id) REFERENCES Polls(poll_id) ON DELETE CASCADE
         );
 
-        -- Enum for order statuses 
+        -- Enum for order statuses
         CREATE TYPE order_status_enum AS ENUM (
             'Чернетка',
             'Нове замовлення',
@@ -314,7 +314,7 @@ const setupDatabase = async () => {
         CREATE INDEX idx_product_reviews_product_id ON ProductReviews(product_id);
         CREATE INDEX idx_product_reviews_user_id ON ProductReviews(user_id);
     `;
-    
+
     // Split by semicolon and execute each statement
     const statements = schemaSQL.split(';').filter(stmt => stmt.trim());
     for (const statement of statements) {
@@ -324,16 +324,16 @@ const setupDatabase = async () => {
     }
 
     console.log('Complete database schema created successfully');
-    
+
     // Create uploads directory
     const uploadsDir = path.join(__dirname, '..', 'uploads', 'products');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
       console.log('Uploads directory created:', uploadsDir);
     }
-    
+
     await dbClient.end();
-    
+
   } catch (error) {
     console.error('Database setup error:', error);
   }

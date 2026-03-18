@@ -16,12 +16,12 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const productId = req.params.productId || 'temp';
     const dir = path.join(uploadsDir, 'products', productId);
-    
+
     // Create directory if it doesn't exist
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    
+
     cb(null, dir);
   },
   filename: (req, file, cb) => {
@@ -47,7 +47,7 @@ const fileFilter = (req, file, cb) => {
     'image/png',
     'image/gif'
   ];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {

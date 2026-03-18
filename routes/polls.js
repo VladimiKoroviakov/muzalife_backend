@@ -10,7 +10,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const userId = req.userId;
 
     const result = await query(`
-      SELECT 
+      SELECT
         p.poll_id,
         p.poll_question,
         p.is_active,
@@ -27,7 +27,7 @@ router.get('/', authenticateToken, async (req, res) => {
               'vote_id', pv.vote_id,
               'vote_text', pv.vote_text,
               'vote_count', (
-                SELECT COUNT(*) 
+                SELECT COUNT(*)
                 FROM PollUserVotes puv3
                 WHERE puv3.vote_id = pv.vote_id
               )
@@ -67,7 +67,7 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
 
     // Get poll details with total votes
     const pollResult = await query(`
-      SELECT 
+      SELECT
         p.*,
         COUNT(DISTINCT puv.user_id) as total_votes
       FROM Polls p
@@ -86,9 +86,9 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
 
     // Get poll options with individual vote counts
     const optionsResult = await query(`
-      SELECT 
-        pv.vote_id, 
-        pv.vote_text, 
+      SELECT
+        pv.vote_id,
+        pv.vote_text,
         COUNT(puv.user_id) as vote_count
       FROM PollVotes pv
       LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
@@ -100,17 +100,17 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
     // Check if current user has voted on this poll and get their vote
     let userVote = null;
     let user_has_voted = false;
-    
+
     if (userId) {
       const userVoteResult = await query(`
-        SELECT 
+        SELECT
           puv.vote_id,
           pv.vote_text
         FROM PollUserVotes puv
         JOIN PollVotes pv ON puv.vote_id = pv.vote_id
         WHERE pv.poll_id = $1 AND puv.user_id = $2
       `, [pollId, userId]);
-      
+
       if (userVoteResult.rows.length > 0) {
         user_has_voted = true;
         userVote = userVoteResult.rows[0].vote_id;
@@ -157,7 +157,7 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
 
     // Check if poll exists and is active
     const pollCheck = await query(`
-      SELECT * FROM Polls 
+      SELECT * FROM Polls
       WHERE poll_id = $1 AND is_active = true
     `, [pollId]);
 
@@ -170,10 +170,10 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
 
     // Check if vote option exists AND belongs to this poll
     const voteCheck = await query(`
-      SELECT * FROM PollVotes 
+      SELECT * FROM PollVotes
       WHERE vote_id = $1 AND poll_id = $2
     `, [vote_id, pollId]);
-    
+
     if (voteCheck.rows.length === 0) {
       return res.status(400).json({
         success: false,
@@ -183,7 +183,7 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
 
     // Check if user has already voted on this poll
     const existingVote = await query(`
-      SELECT puv.* 
+      SELECT puv.*
       FROM PollUserVotes puv
       JOIN PollVotes pv ON puv.vote_id = pv.vote_id
       WHERE pv.poll_id = $1 AND puv.user_id = $2
@@ -198,7 +198,7 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
 
     // Record the vote (no poll_id in PollUserVotes table)
     await query(`
-      INSERT INTO PollUserVotes (vote_id, user_id) 
+      INSERT INTO PollUserVotes (vote_id, user_id)
       VALUES ($1, $2)
     `, [vote_id, userId]);
 
@@ -208,7 +208,7 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error recording vote:', error);
-    
+
     // Check for duplicate vote constraint violation
     if (error.code === '23505') { // PostgreSQL unique violation
       return res.status(400).json({
@@ -216,7 +216,7 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
         error: 'You have already voted on this poll'
       });
     }
-    
+
     res.status(500).json({
       success: false,
       error: 'Failed to record vote',
@@ -244,15 +244,15 @@ router.get('/:pollId/results', async (req, res) => {
 
     // Get all options for this poll with vote counts
     const result = await query(`
-      SELECT 
-        pv.vote_id, 
-        pv.vote_text, 
+      SELECT
+        pv.vote_id,
+        pv.vote_text,
         COUNT(puv.user_id) as vote_count
       FROM PollVotes pv
       LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
       WHERE pv.poll_id = $1
       GROUP BY pv.vote_id, pv.vote_text
-      ORDER BY 
+      ORDER BY
         COUNT(puv.user_id) DESC,
         pv.vote_created_at ASC
     `, [pollId]);
@@ -265,9 +265,9 @@ router.get('/:pollId/results', async (req, res) => {
       vote_id: row.vote_id,
       vote_text: row.vote_text,
       vote_count: parseInt(row.vote_count || 0),
-      percentage: totalVotes > 0 
+      percentage: totalVotes > 0
         ? ((parseInt(row.vote_count || 0) / totalVotes) * 100).toFixed(1)
-        : "0.0"
+        : '0.0'
     }));
 
     res.json({
@@ -312,9 +312,9 @@ router.put('/:pollId/status', authenticateToken, async (req, res) => {
     }
 
     const result = await query(`
-      UPDATE Polls 
-      SET is_active = $1 
-      WHERE poll_id = $2 
+      UPDATE Polls
+      SET is_active = $1
+      WHERE poll_id = $2
       RETURNING *
     `, [is_active, pollId]);
 
@@ -341,7 +341,7 @@ router.put('/:pollId/status', authenticateToken, async (req, res) => {
 });
 
 // ------- CHECK THIS ONE -------
-// Create a new poll (admin only) 
+// Create a new poll (admin only)
 router.post('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.user_id;
@@ -366,8 +366,8 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // Create the poll
     const pollResult = await query(`
-      INSERT INTO Polls (poll_question, is_active) 
-      VALUES ($1, true) 
+      INSERT INTO Polls (poll_question, is_active)
+      VALUES ($1, true)
       RETURNING *
     `, [poll_question]);
 
@@ -376,7 +376,7 @@ router.post('/', authenticateToken, async (req, res) => {
     // Insert poll options
     const insertOptionsPromises = options.map(optionText => {
       return query(`
-        INSERT INTO PollVotes (poll_id, vote_text) 
+        INSERT INTO PollVotes (poll_id, vote_text)
         VALUES ($1, $2)
       `, [pollId, optionText]);
     });

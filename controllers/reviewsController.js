@@ -5,13 +5,13 @@ import { constructFullUrl } from '../utils/urlHelper.js';
 export const getProductReviews = async (req, res) => {
   try {
     const productId = parseInt(req.params.productId);
-    
+
     if (isNaN(productId)) {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
 
     const query = `
-      SELECT 
+      SELECT
         r.review_id,
         r.review_rating,
         r.review_text,
@@ -26,9 +26,9 @@ export const getProductReviews = async (req, res) => {
       WHERE pr.product_id = $1
       ORDER BY pr.review_created_at DESC
     `;
-    
+
     const result = await pool.query(query, [productId]);
-    
+
     // Transform the data to match your frontend Review type
     const reviews = result.rows.map(review => ({
       id: review.review_id,
@@ -53,13 +53,13 @@ export const getProductReviews = async (req, res) => {
 export const getReviewsByUser = async (req, res) => {
   try {
     const userId = parseInt(req.params.userId);
-    
+
     if (isNaN(userId)) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
     const query = `
-      SELECT 
+      SELECT
         r.review_id as id,
         r.review_text as comment,
         r.review_rating as rating,
@@ -68,7 +68,7 @@ export const getReviewsByUser = async (req, res) => {
         COALESCE(
           NULLIF(u.user_avatar_url, ''),
           CONCAT(
-            'https://ui-avatars.com/api/?name=', 
+            'https://ui-avatars.com/api/?name=',
             REPLACE(u.user_name, ' ', '+'),
             '&background=random'
           )
@@ -84,7 +84,7 @@ export const getReviewsByUser = async (req, res) => {
     `;
 
     const result = await pool.query(query, [userId]);
-    
+
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching user reviews:', error);
@@ -109,21 +109,21 @@ export const submitReview = async (req, res) => {
 
     // Check if user already reviewed this product
     const existingReviewQuery = `
-      SELECT r.review_id 
+      SELECT r.review_id
       FROM Reviews r
       INNER JOIN ProductReviews pr ON r.review_id = pr.review_id
       WHERE pr.user_id = $1 AND pr.product_id = $2
     `;
 
     const existingReview = await pool.query(existingReviewQuery, [userId, productId]);
-    
+
     if (existingReview.rows.length > 0) {
       return res.status(409).json({ error: 'You have already reviewed this product' });
     }
 
     // Start transaction
     const client = await pool.connect();
-    
+
     try {
       await client.query('BEGIN');
 
@@ -133,7 +133,7 @@ export const submitReview = async (req, res) => {
         VALUES ($1, $2)
         RETURNING review_id
       `;
-      
+
       const reviewResult = await client.query(insertReviewQuery, [comment, rating]);
       const reviewId = reviewResult.rows[0].review_id;
 
@@ -142,14 +142,14 @@ export const submitReview = async (req, res) => {
         INSERT INTO ProductReviews (review_id, user_id, product_id, review_created_at)
         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
       `;
-      
+
       await client.query(insertProductReviewQuery, [reviewId, userId, productId]);
 
       // 3. Update product rating (average)
       const updateProductRatingQuery = `
-        UPDATE Products 
+        UPDATE Products
         SET product_rating = (
-          SELECT AVG(r.review_rating) 
+          SELECT AVG(r.review_rating)
           FROM Reviews r
           INNER JOIN ProductReviews pr ON r.review_id = pr.review_id
           WHERE pr.product_id = $1
@@ -157,14 +157,14 @@ export const submitReview = async (req, res) => {
         product_updated_at = CURRENT_TIMESTAMP
         WHERE product_id = $1
       `;
-      
+
       await client.query(updateProductRatingQuery, [productId]);
 
       await client.query('COMMIT');
 
       // Return the created review
       const newReviewQuery = `
-        SELECT 
+        SELECT
           r.review_id as id,
           r.review_text as comment,
           r.review_rating as rating,
@@ -173,7 +173,7 @@ export const submitReview = async (req, res) => {
           COALESCE(
             NULLIF(u.user_avatar_url, ''),
             CONCAT(
-              'https://ui-avatars.com/api/?name=', 
+              'https://ui-avatars.com/api/?name=',
               REPLACE(u.user_name, ' ', '+'),
               '&background=random'
             )
@@ -188,9 +188,9 @@ export const submitReview = async (req, res) => {
       `;
 
       const newReviewResult = await client.query(newReviewQuery, [reviewId]);
-      
+
       res.status(201).json(newReviewResult.rows[0]);
-      
+
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -221,13 +221,13 @@ export const submitReview = async (req, res) => {
 
 //     // Check if review exists and belongs to user
 //     const checkQuery = `
-//       SELECT pr.product_id 
-//       FROM ProductReviews pr 
+//       SELECT pr.product_id
+//       FROM ProductReviews pr
 //       WHERE pr.review_id = $1 AND pr.user_id = $2
 //     `;
 
 //     const checkResult = await pool.query(checkQuery, [reviewId, userId]);
-    
+
 //     if (checkResult.rows.length === 0) {
 //       return res.status(404).json({ error: 'Review not found or access denied' });
 //     }
@@ -236,7 +236,7 @@ export const submitReview = async (req, res) => {
 
 //     // Update review
 //     const updateQuery = `
-//       UPDATE Reviews 
+//       UPDATE Reviews
 //       SET review_text = COALESCE($1, review_text),
 //           review_rating = COALESCE($2, review_rating),
 //       WHERE review_id = $3
@@ -247,9 +247,9 @@ export const submitReview = async (req, res) => {
 
 //     // Update product rating
 //     const updateProductRatingQuery = `
-//       UPDATE Products 
+//       UPDATE Products
 //       SET product_rating = (
-//         SELECT AVG(r.review_rating) 
+//         SELECT AVG(r.review_rating)
 //         FROM Reviews r
 //         INNER JOIN ProductReviews pr ON r.review_id = pr.review_id
 //         WHERE pr.product_id = $1
@@ -257,7 +257,7 @@ export const submitReview = async (req, res) => {
 //       product_updated_at = CURRENT_TIMESTAMP
 //       WHERE product_id = $1
 //     `;
-    
+
 //     await pool.query(updateProductRatingQuery, [productId]);
 
 //     res.json(updateResult.rows[0]);
@@ -279,13 +279,13 @@ export const deleteReview = async (req, res) => {
 
     // Check if review exists and belongs to user
     const checkQuery = `
-      SELECT pr.product_id 
-      FROM ProductReviews pr 
+      SELECT pr.product_id
+      FROM ProductReviews pr
       WHERE pr.review_id = $1 AND pr.user_id = $2
     `;
 
     const checkResult = await pool.query(checkQuery, [reviewId, userId]);
-    
+
     if (checkResult.rows.length === 0) {
       return res.status(404).json({ error: 'Review not found or access denied' });
     }
@@ -298,9 +298,9 @@ export const deleteReview = async (req, res) => {
 
     // Update product rating
     const updateProductRatingQuery = `
-      UPDATE Products 
+      UPDATE Products
       SET product_rating = COALESCE((
-        SELECT AVG(r.review_rating) 
+        SELECT AVG(r.review_rating)
         FROM Reviews r
         INNER JOIN ProductReviews pr ON r.review_id = pr.review_id
         WHERE pr.product_id = $1
@@ -308,7 +308,7 @@ export const deleteReview = async (req, res) => {
       product_updated_at = CURRENT_TIMESTAMP
       WHERE product_id = $1
     `;
-    
+
     await pool.query(updateProductRatingQuery, [productId]);
 
     res.json({ message: 'Review deleted successfully' });

@@ -8,14 +8,14 @@ const router = express.Router();
 router.get('/ids', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId;
-    
+
     const result = await query(
       'SELECT product_id FROM SavedUserProducts WHERE user_id = $1',
       [userId]
     );
-    
+
     const productIds = result.rows.map(row => row.product_id);
-    
+
     res.json({
       success: true,
       data: productIds

@@ -35,10 +35,10 @@ class VerificationService {
   async verifyCode(email, code) {
     try {
       const result = await query(
-        `SELECT * FROM EmailVerificationCodes 
-         WHERE email = $1 
-         AND code = $2 
-         AND is_used = false 
+        `SELECT * FROM EmailVerificationCodes
+         WHERE email = $1
+         AND code = $2
+         AND is_used = false
          AND expires_at > NOW()`,
         [email, code]
       );
@@ -64,9 +64,9 @@ class VerificationService {
   async hasPendingVerification(email) {
     try {
       const result = await query(
-        `SELECT * FROM EmailVerificationCodes 
-         WHERE email = $1 
-         AND is_used = false 
+        `SELECT * FROM EmailVerificationCodes
+         WHERE email = $1
+         AND is_used = false
          AND expires_at > NOW()`,
         [email]
       );

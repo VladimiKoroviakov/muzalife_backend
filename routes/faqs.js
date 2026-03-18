@@ -7,7 +7,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const result = await query('SELECT faq_id as id, question, answer FROM FAQs ORDER BY faq_id');
-    
+
     res.json({
       success: true,
       data: result.rows,
@@ -28,14 +28,14 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const result = await query('SELECT faq_id as id, question, answer FROM FAQs WHERE faq_id = $1', [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'FAQ not found'
       });
     }
-    
+
     res.json({
       success: true,
       data: result.rows[0]

@@ -21,7 +21,7 @@ export const initiateRegistration = async (req, res) => {
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Користувач з таким email вже існує',
         code: 'USER_EXISTS'
       });
@@ -38,11 +38,11 @@ export const initiateRegistration = async (req, res) => {
 
     // Generate verification code
     const verificationCode = await verificationService.createVerificationCode(email, 'registration');
-    
+
     // Try to send email
     try {
       await emailService.sendVerificationEmail(email, verificationCode);
-      
+
       // Return success response
       const response = {
         success: true,
@@ -50,26 +50,26 @@ export const initiateRegistration = async (req, res) => {
         email: email,
         name: name,
       };
-      
+
       res.status(200).json(response);
-      
+
     } catch (emailError) {
       console.error('Email sending error:', emailError.message);
-      
+
       // Cleanup: remove the created verification code
       await query(
         'DELETE FROM EmailVerificationCodes WHERE email = $1 AND code = $2',
         [email, verificationCode]
       );
-      
-      return res.status(500).json({ 
+
+      return res.status(500).json({
         error: 'Не вдалося відправити email з підтвердженням. Спробуйте ще раз.',
         code: 'EMAIL_SEND_FAILED'
       });
     }
   } catch (error) {
     console.error('Registration initiation error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Внутрішня помилка сервера',
       details: error.message
     });
@@ -87,12 +87,12 @@ export const verifyEmailAndRegister = async (req, res) => {
 
     // Verify the code
     const verificationResult = await verificationService.verifyCode(
-      email, 
+      email,
       verificationCode
     );
-    
+
     if (!verificationResult.isValid) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: verificationResult.message,
         code: 'INVALID_VERIFICATION_CODE'
       });
@@ -105,7 +105,7 @@ export const verifyEmailAndRegister = async (req, res) => {
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Користувач з таким email вже існує',
         code: 'USER_EXISTS'
       });
@@ -159,7 +159,7 @@ export const resendVerificationCode = async (req, res) => {
     );
 
     if (existingUser.rows.length > 0) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Користувач з таким email вже існує',
         code: 'USER_EXISTS'
       });
@@ -167,10 +167,10 @@ export const resendVerificationCode = async (req, res) => {
 
     // Generate new verification code
     const verificationCode = await verificationService.createVerificationCode(
-      email, 
+      email,
       'registration'
     );
-    
+
     // Send new verification email
     await emailService.sendVerificationEmail(email, verificationCode);
 
@@ -180,13 +180,13 @@ export const resendVerificationCode = async (req, res) => {
     });
   } catch (error) {
     console.error('Resend verification error:', error);
-    
+
     if (error.message === 'Failed to send verification email') {
-      return res.status(500).json({ 
-        error: 'Не вдалося відправити email. Спробуйте ще раз пізніше.' 
+      return res.status(500).json({
+        error: 'Не вдалося відправити email. Спробуйте ще раз пізніше.'
       });
     }
-    
+
     res.status(500).json({ error: 'Внутрішня помилка сервера' });
   }
 };
@@ -223,14 +223,14 @@ export const login = async (req, res) => {
 
     // Server-side validation based on login type
     if (loginType === 'admin' && !user.is_admin) {
-      return res.status(403).json({ 
-        error: 'Access denied. You do not have administrator privileges.' 
+      return res.status(403).json({
+        error: 'Access denied. You do not have administrator privileges.'
       });
     }
 
     if (loginType === 'regular' && user.is_admin) {
-      return res.status(403).json({ 
-        error: 'Адміністратор має заходити через сторінку /admin.' 
+      return res.status(403).json({
+        error: 'Адміністратор має заходити через сторінку /admin.'
       });
     }
 
@@ -266,8 +266,8 @@ export const googleAuth = async (req, res) => {
       const googleResponse = await axios.get(
         `https://www.googleapis.com/oauth2/v3/userinfo`,
         {
-          headers: { 
-            Authorization: `Bearer ${accessToken}` 
+          headers: {
+            Authorization: `Bearer ${accessToken}`
           },
           timeout: 10000 // 10 second timeout
         }
@@ -291,15 +291,15 @@ export const googleAuth = async (req, res) => {
       if (userResult.rows.length === 0) {
         // Create new user
         const result = await query(
-          `INSERT INTO Users (user_email, user_name, user_google_id, user_auth_provider, user_avatar_url) 
-           VALUES ($1, $2, $3, $4, $5) 
+          `INSERT INTO Users (user_email, user_name, user_google_id, user_auth_provider, user_avatar_url)
+           VALUES ($1, $2, $3, $4, $5)
            RETURNING user_id, user_email, user_name, user_avatar_url, user_auth_provider, user_created_at`,
           [email, name, googleId, 'google', picture]
         );
         user = result.rows[0];
       } else {
         user = userResult.rows[0];
-        
+
         // Update google_id if user exists but doesn't have it
         if (!user.user_google_id) {
           await query(
@@ -327,7 +327,7 @@ export const googleAuth = async (req, res) => {
 
     } catch (googleError) {
       console.error('Google API error:', googleError.response?.data || googleError.message);
-      
+
       if (googleError.response?.status === 401) {
         return res.status(401).json({ error: 'Invalid Google access token' });
       } else if (googleError.response?.status === 400) {
@@ -353,7 +353,7 @@ export const facebookAuth = async (req, res) => {
       return res.status(400).json({ error: 'Access token is required' });
     }
 
-    try {      
+    try {
       const debugResponse = await axios.get(
         `https://graph.facebook.com/debug_token`,
         {
@@ -366,16 +366,16 @@ export const facebookAuth = async (req, res) => {
       );
 
       const tokenData = debugResponse.data.data;
-      
+
       if (!tokenData.is_valid) {
-        return res.status(401).json({ 
-          error: `Invalid Facebook access token: ${tokenData.error?.message || 'Token is not valid'}` 
+        return res.status(401).json({
+          error: `Invalid Facebook access token: ${tokenData.error?.message || 'Token is not valid'}`
         });
       }
 
       if (tokenData.app_id !== process.env.FACEBOOK_APP_ID) {
-        return res.status(401).json({ 
-          error: 'Token was issued for a different Facebook app' 
+        return res.status(401).json({
+          error: 'Token was issued for a different Facebook app'
         });
       }
 
@@ -408,15 +408,15 @@ export const facebookAuth = async (req, res) => {
       if (userResult.rows.length === 0) {
         const userName = name || `${first_name} ${last_name}`.trim() || `Facebook User ${facebookId}`;
         const result = await query(
-          `INSERT INTO Users (user_email, user_name, user_facebook_id, user_auth_provider, user_avatar_url) 
-           VALUES ($1, $2, $3, $4, $5) 
+          `INSERT INTO Users (user_email, user_name, user_facebook_id, user_auth_provider, user_avatar_url)
+           VALUES ($1, $2, $3, $4, $5)
            RETURNING user_id, user_email, user_name, user_avatar_url, user_auth_provider, user_created_at`,
           [userEmail, userName, facebookId, 'facebook', picture?.data?.url]
         );
         user = result.rows[0];
       } else {
         user = userResult.rows[0];
-        
+
         // Update facebook_id if user exists but doesn't have it
         if (!user.user_facebook_id) {
           await query(
@@ -443,34 +443,34 @@ export const facebookAuth = async (req, res) => {
       });
 
     } catch (facebookError) {
-      
+
       if (facebookError.response?.status === 400) {
         const errorData = facebookError.response.data;
         if (errorData.error?.code === 190) {
-          return res.status(401).json({ 
-            error: 'Expired or invalid Facebook access token. Please try logging in again.' 
+          return res.status(401).json({
+            error: 'Expired or invalid Facebook access token. Please try logging in again.'
           });
         }
-        return res.status(400).json({ 
-          error: `Facebook API error: ${errorData.error?.message || 'Invalid request'}` 
+        return res.status(400).json({
+          error: `Facebook API error: ${errorData.error?.message || 'Invalid request'}`
         });
       } else if (facebookError.code === 'ECONNABORTED') {
         return res.status(408).json({ error: 'Facebook API timeout. Please try again.' });
       } else if (facebookError.response?.status === 401) {
-        return res.status(401).json({ 
-          error: 'Facebook authentication failed. The access token is invalid or has expired.' 
+        return res.status(401).json({
+          error: 'Facebook authentication failed. The access token is invalid or has expired.'
         });
       } else {
-        return res.status(502).json({ 
-          error: 'Unable to connect to Facebook. Please try again later.' 
+        return res.status(502).json({
+          error: 'Unable to connect to Facebook. Please try again later.'
         });
       }
     }
 
   } catch (error) {
     console.error('Unexpected Facebook auth error:', error);
-    res.status(500).json({ 
-      error: 'An unexpected error occurred during Facebook authentication.' 
+    res.status(500).json({
+      error: 'An unexpected error occurred during Facebook authentication.'
     });
   }
 };

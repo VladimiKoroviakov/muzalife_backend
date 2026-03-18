@@ -26,20 +26,23 @@ class EmailService {
     // Validate required SMTP settings
     const requiredEnvVars = ['SMTP_USER', 'SMTP_PASSWORD'];
     const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-    
+
     if (missingVars.length > 0) {
       console.warn(`⚠️  Missing SMTP environment variables: ${missingVars.join(', ')}`);
     }
 
     try {
       const transporter = nodemailer.createTransport(smtpConfig);
-      
+
       // Verify connection configuration
       transporter.verify((error, success) => {
-        error ? console.error('❌ SMTP connection failed:', error.message) 
-          : console.log('✅ SMTP server is ready to send messages');
+        if (error) {
+          console.error('❌ SMTP connection failed:', error.message);
+        } else {
+          console.error('✅ SMTP server is ready to send messages');
+        }
       });
-      
+
       return transporter;
     } catch (error) {
       console.error('❌ Failed to create SMTP transporter:', error.message);
@@ -62,29 +65,29 @@ class EmailService {
             <div style="text-align: center; margin-bottom: 30px;">
               <h1 style="color: #5e89e8;">Muza Life</h1>
             </div>
-            
+
             <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;">
               <h2 style="color: #333; margin-bottom: 20px;">Підтвердження електронної пошти</h2>
               <p style="color: #666; margin-bottom: 30px; font-size: 16px;">
-                ${verification_type === 'registration' ? 'Дякуємо за реєстрацію! Для завершення процесу, будь ласка, введіть наступний код підтвердження:' 
+                ${verification_type === 'registration' ? 'Дякуємо за реєстрацію! Для завершення процесу, будь ласка, введіть наступний код підтвердження:'
                   : 'Для завершення зміни електронної пошти, будь ласка, введіть наступний код підтвердження:'}
               </p>
-              
+
               <div style="background-color: white; padding: 20px; border-radius: 8px; border: 2px dashed #5e89e8; display: inline-block; margin: 20px 0;">
                 <h3 style="color: #5e89e8; font-size: 32px; letter-spacing: 10px; margin: 0; font-family: monospace;">
                   ${verificationCode}
                 </h3>
               </div>
-              
+
               <p style="color: #999; font-size: 14px; margin-top: 20px;">
                 Цей код дійсний протягом 15 хвилин.
               </p>
-              
+
               <p style="color: #666; font-size: 14px; margin-top: 40px;">
                 ${verification_type === 'registration' ? 'Якщо ви не реєструвались на Muza Life, просто проігноруйте цей лист.' : 'Якщо ви не змінювали електронну пошту на Muza Life, просто проігноруйте цей лист.'}
               </p>
             </div>
-            
+
             <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
               <p style="color: #999; font-size: 12px;">
                 &copy; ${new Date().getFullYear()} Muza Life. Всі права захищені.

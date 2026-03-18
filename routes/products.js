@@ -6,7 +6,7 @@ import pool from "../config/database.js";
 router.get('/', async (req, res) => {
   try {
     const query = `
-      SELECT 
+      SELECT
         p.product_id AS id,
         p.product_title AS title,
         p.product_description AS description,
@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
       LEFT JOIN productimages pi ON p.product_id = pi.product_id
       LEFT JOIN images i ON pi.image_id = i.image_id
 
-      GROUP BY 
+      GROUP BY
         p.product_id,
         pt.product_type_id,
         pt.product_type_name,
@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
     `;
 
     const result = await pool.query(query);
-    
+
     const products = result.rows.map(product => ({
       id: product.id,
       title: product.title,
@@ -77,13 +77,13 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const productId = parseInt(req.params.id);
-    
+
     if (isNaN(productId)) {
       return res.status(400).json({ error: 'Invalid product ID' });
     }
 
     const query = `
-      SELECT 
+      SELECT
         p.product_id AS id,
         p.product_title AS title,
         p.product_description AS description,
@@ -113,7 +113,7 @@ router.get('/:id', async (req, res) => {
 
       WHERE p.product_id = $1
 
-      GROUP BY 
+      GROUP BY
         p.product_id,
         pt.product_type_id,
         pt.product_type_name,
@@ -127,7 +127,7 @@ router.get('/:id', async (req, res) => {
     `;
 
     const result = await pool.query(query, [productId]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }

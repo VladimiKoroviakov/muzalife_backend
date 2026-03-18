@@ -1,6 +1,6 @@
 import express from 'express';
-import { 
-  submitReview, 
+import {
+  submitReview,
   getProductReviews,
   getReviewsByUser,
   // updateReview,
