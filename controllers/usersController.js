@@ -432,7 +432,7 @@ export const resendMaterial = async (req, res) => {
     // 3. Log the resend action
 
     // For now, we'll just return success
-    console.log(`Resending material: ${materialName} to user ${userId}`);
+    // TODO: replace with proper logger — console.log(`Resending material: ${materialName} to user ${userId}`);
 
     res.json({ 
       success: true,

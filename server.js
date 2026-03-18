@@ -60,7 +60,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/product-files', productFilesRoutes);
 app.use('/api/faqs', faqRoutes);
-app.use('/api/users', userRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/products', productsRouter);
 app.use('/api/saved-products', savedProductsRoutes);

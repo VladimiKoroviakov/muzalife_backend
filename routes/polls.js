@@ -63,7 +63,7 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
     const { pollId } = req.params;
     const userId = req.userId;
 
-    console.log(`Fetching poll ${pollId} for user ${userId}`);
+    // debug: console.log(`Fetching poll ${pollId} for user ${userId}`);
 
     // Get poll details with total votes
     const pollResult = await query(`
@@ -146,7 +146,7 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
     const { vote_id } = req.body;
     const userId = req.userId;
 
-    console.log(`User ${userId} voting on poll ${pollId} for option ${vote_id}`);
+    // debug: console.log(`User ${userId} voting on poll ${pollId} for option ${vote_id}`);
 
     if (!vote_id) {
       return res.status(400).json({
