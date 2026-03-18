@@ -1,7 +1,1 @@
-#!/usr/bin/env sh
-# Pre-commit hook: run ESLint on staged JS files before every commit.
-# Installed via Husky. To skip: git commit --no-verify (emergency only).
-
-. "$(dirname -- "$0")/_/husky.sh"
-
 npx lint-staged
