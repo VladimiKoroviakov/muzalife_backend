@@ -1,4 +1,4 @@
-import pool from "../config/database.js";
+import pool from '../config/database.js';
 import { constructFullUrl } from '../utils/urlHelper.js';
 
 // GET /api/reviews/product/:productId - Get all reviews for a specific product
@@ -30,7 +30,7 @@ export const getProductReviews = async (req, res) => {
     const result = await pool.query(query, [productId]);
 
     // Transform the data to match your frontend Review type
-    const reviews = result.rows.map(review => ({
+    const reviews = result.rows.map((review) => ({
       id: review.review_id,
       productId: review.product_id,
       userId: review.user_id,

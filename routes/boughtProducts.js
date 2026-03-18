@@ -14,7 +14,7 @@ router.get('/ids', authenticateToken, async (req, res) => {
       [userId]
     );
 
-    const productIds = result.rows.map(row => row.product_id);
+    const productIds = result.rows.map((row) => row.product_id);
 
     res.json({
       success: true,

@@ -47,8 +47,8 @@ export const initiateRegistration = async (req, res) => {
       const response = {
         success: true,
         message: 'Код підтвердження відправлено на вашу електронну пошту',
-        email: email,
-        name: name,
+        email,
+        name,
       };
 
       res.status(200).json(response);
@@ -264,7 +264,7 @@ export const googleAuth = async (req, res) => {
     // Verify Google access token and get user info
     try {
       const googleResponse = await axios.get(
-        `https://www.googleapis.com/oauth2/v3/userinfo`,
+        'https://www.googleapis.com/oauth2/v3/userinfo',
         {
           headers: {
             Authorization: `Bearer ${accessToken}`
@@ -281,7 +281,7 @@ export const googleAuth = async (req, res) => {
       }
 
       // Find or create user
-      let userResult = await query(
+      const userResult = await query(
         'SELECT * FROM Users WHERE user_google_id = $1 OR user_email = $2',
         [googleId, email]
       );
@@ -355,7 +355,7 @@ export const facebookAuth = async (req, res) => {
 
     try {
       const debugResponse = await axios.get(
-        `https://graph.facebook.com/debug_token`,
+        'https://graph.facebook.com/debug_token',
         {
           params: {
             input_token: accessToken,
@@ -398,7 +398,7 @@ export const facebookAuth = async (req, res) => {
         userEmail = `fb_${facebookId}@placeholder.facebook`;
       }
 
-      let userResult = await query(
+      const userResult = await query(
         'SELECT * FROM Users WHERE user_facebook_id = $1 OR user_email = $2',
         [facebookId, userEmail]
       );

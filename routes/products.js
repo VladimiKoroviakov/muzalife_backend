@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-import pool from "../config/database.js";
+import pool from '../config/database.js';
 
 // GET /api/products - Get all products with their relationships
 router.get('/', async (req, res) => {
@@ -51,19 +51,19 @@ router.get('/', async (req, res) => {
 
     const result = await pool.query(query);
 
-    const products = result.rows.map(product => ({
+    const products = result.rows.map((product) => ({
       id: product.id,
       title: product.title,
       price: parseFloat(product.price),
       rating: parseFloat(product.rating),
       type: product.type,
       image: product.image,
-      ageCategory: product.agecategories.filter(age => age !== null),
-      events: product.events.filter(event => event !== null),
+      ageCategory: product.agecategories.filter((age) => age !== null),
+      events: product.events.filter((event) => event !== null),
       description: product.description,
       createdAt: product.createdat,
       updatedAt: product.updatedat,
-      additionalImages: product.additionalimages.filter(img => img !== null)
+      additionalImages: product.additionalimages.filter((img) => img !== null)
     }));
 
     res.json(products);
@@ -140,12 +140,12 @@ router.get('/:id', async (req, res) => {
       rating: parseFloat(product.rating),
       type: product.type,
       image: product.image,
-      ageCategory: product.agecategories.filter(age => age !== null),
-      events: product.events.filter(event => event !== null),
+      ageCategory: product.agecategories.filter((age) => age !== null),
+      events: product.events.filter((event) => event !== null),
       description: product.description,
       createdAt: product.createdat,
       updatedAt: product.updatedat,
-      additionalImages: product.additionalimages.filter(img => img !== null)
+      additionalImages: product.additionalimages.filter((img) => img !== null)
     };
 
     res.json(transformedProduct);
@@ -156,17 +156,17 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/products
-router.post('/', async (req, res) => {
+router.post('/', async (_req, _res) => {
   // Implementation for creating a new product
 });
 
 // PUT /api/products/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', async (_req, _res) => {
   // Implementation for updating a product by ID
 });
 
 // DELETE /api/products/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (_req, _res) => {
   // Implementation for deleting a product by ID
 });
 

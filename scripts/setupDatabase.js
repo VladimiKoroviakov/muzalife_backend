@@ -316,7 +316,7 @@ const setupDatabase = async () => {
     `;
 
     // Split by semicolon and execute each statement
-    const statements = schemaSQL.split(';').filter(stmt => stmt.trim());
+    const statements = schemaSQL.split(';').filter((stmt) => stmt.trim());
     for (const statement of statements) {
       if (statement.trim()) {
         await dbClient.query(statement);

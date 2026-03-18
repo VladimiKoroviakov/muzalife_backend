@@ -1,6 +1,5 @@
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
-import fs from 'fs';
 
 dotenv.config();
 
@@ -25,7 +24,7 @@ class EmailService {
 
     // Validate required SMTP settings
     const requiredEnvVars = ['SMTP_USER', 'SMTP_PASSWORD'];
-    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
 
     if (missingVars.length > 0) {
       console.warn(`⚠️  Missing SMTP environment variables: ${missingVars.join(', ')}`);
@@ -35,7 +34,7 @@ class EmailService {
       const transporter = nodemailer.createTransport(smtpConfig);
 
       // Verify connection configuration
-      transporter.verify((error, success) => {
+      transporter.verify((error, _success) => {
         if (error) {
           console.error('❌ SMTP connection failed:', error.message);
         } else {
@@ -98,7 +97,7 @@ class EmailService {
         text: verification_type === 'registration' ? `Підтвердження електронної пошти для Muza Life\n\nВаш код підтвердження: ${verificationCode}\n\nЦей код дійсний протягом 15 хвилин.\n\nЯкщо ви не реєструвались, проігноруйте цей лист.` : `Підтвердження зміни електронної пошти для Muza Life\n\nВаш код підтвердження: ${verificationCode}\n\nЦей код дійсний протягом 15 хвилин.\n\nЯкщо ви не змінювали електронну пошту, проігноруйте цей лист.`
       };
 
-      const info = await this.transporter.sendMail(mailOptions);
+      await this.transporter.sendMail(mailOptions);
       return true;
     } catch (error) {
       console.error('❌ Error in email service:', error.message);

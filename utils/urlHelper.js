@@ -1,5 +1,5 @@
 export const constructFullUrl = (req, imagePath) => {
-  if (!imagePath) return null;
+  if (!imagePath) {return null;}
 
   // If it's already a full URL (http:// or https://), return as is
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {

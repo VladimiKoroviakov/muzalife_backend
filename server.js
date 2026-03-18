@@ -50,8 +50,9 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Debug middleware — intentional request logger
-// eslint-disable-next-line no-console
+
 app.use((req, res, next) => {
+  // eslint-disable-next-line no-console
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
@@ -223,7 +224,7 @@ app.use('*', (req, res) => {
 });
 
 // Global error handler
-app.use((error, req, res, next) => {
+app.use((error, req, res, _next) => {
   console.error('Global error handler:', error);
 
   // Handle multer file upload errors
@@ -254,7 +255,7 @@ https.createServer(sslOptions, app).listen(PORT, () => {
   console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
   console.log(`📍 API Documentation: http://localhost:${PORT}/api/info`);
   console.log(`📍 Database test: http://localhost:${PORT}/api/test-db`);
-  console.log(`📍 Available endpoints:`);
+  console.log('📍 Available endpoints:');
   console.log(`   🔐 Auth: http://localhost:${PORT}/api/auth`);
   console.log(`   👥 Users: http://localhost:${PORT}/api/users`);
   console.log(`   📦 Products: http://localhost:${PORT}/api/products`);

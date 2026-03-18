@@ -151,7 +151,7 @@ export const initiateEmailChange = async (req, res) => {
       success: true,
       message: 'Код підтвердження відправлено на нову email адресу',
       email: newEmail,
-      currentEmail: currentEmail
+      currentEmail
     });
   } catch (error) {
     console.error('Email change initiation error:', error);
@@ -271,7 +271,7 @@ export const resendEmailChangeCode = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Новий код підтвердження відправлено',
-      email: email
+      email
     });
   } catch (error) {
     console.error('Resend email change code error:', error);
@@ -423,8 +423,8 @@ export const deleteAccount = async (req, res) => {
  */
 export const resendMaterial = async (req, res) => {
   try {
-    const { materialName, purchaseDate } = req.body;
-    const userId = req.userId;
+    const { materialName: _materialName, purchaseDate: _purchaseDate } = req.body;
+    const _userId = req.userId;
 
     // Here you would typically:
     // 1. Verify the user purchased this material

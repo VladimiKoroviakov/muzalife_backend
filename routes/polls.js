@@ -122,7 +122,7 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
       ...pollResult.rows[0],
       options: optionsResult.rows,
       user_vote: userVote,
-      user_has_voted: user_has_voted
+      user_has_voted
     };
 
     res.json({
@@ -261,7 +261,7 @@ router.get('/:pollId/results', async (req, res) => {
     const totalVotes = result.rows.reduce((sum, row) => sum + parseInt(row.vote_count || 0), 0);
 
     // Add percentages to each option
-    const resultsWithPercentages = result.rows.map(row => ({
+    const resultsWithPercentages = result.rows.map((row) => ({
       vote_id: row.vote_id,
       vote_text: row.vote_text,
       vote_count: parseInt(row.vote_count || 0),
@@ -374,7 +374,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const pollId = pollResult.rows[0].poll_id;
 
     // Insert poll options
-    const insertOptionsPromises = options.map(optionText => {
+    const insertOptionsPromises = options.map((optionText) => {
       return query(`
         INSERT INTO PollVotes (poll_id, vote_text)
         VALUES ($1, $2)
