@@ -3,6 +3,17 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
+  // ─── Global ignores (replaces .eslintignore for ESLint v9) ───────────
+  {
+    ignores: [
+      'node_modules/**',
+      'uploads/**',
+      'certs/**',
+      'dist/**',
+      'coverage/**',
+      '**/*.min.js',
+    ],
+  },
   js.configs.recommended,
   {
     files: ['**/*.js'],
