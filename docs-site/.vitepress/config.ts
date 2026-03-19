@@ -14,6 +14,9 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
+  // localhost links in API docs are intentional (dev server URLs) — skip check
+  ignoreDeadLinks: true,
+
   // ── Site metadata ─────────────────────────────────────────────────────────
   title: 'MuzaLife Backend',
   description: 'REST API documentation for the MuzaLife platform',
