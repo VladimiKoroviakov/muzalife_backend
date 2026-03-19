@@ -407,21 +407,6 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Review' }
-
-  /reviews/product/{productId}:
-    get:
-      tags: [Reviews]
-      summary: Get reviews for a product
-      parameters:
-        - in: path
-          name: productId
-          required: true
-          schema: { type: integer }
-      responses:
-        '200':
-          description: Reviews for product
-
-  /reviews:
     post:
       tags: [Reviews]
       summary: Create a review (protected)
@@ -443,6 +428,19 @@ paths:
           description: Review created
         '401':
           description: Unauthorized
+
+  /reviews/product/{productId}:
+    get:
+      tags: [Reviews]
+      summary: Get reviews for a product
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Reviews for product
 
   # ── FAQs ──────────────────────────────────────────────────────────────
   /faqs:

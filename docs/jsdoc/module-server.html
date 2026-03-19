@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: utils/urlHelper</title>
+    <title>JSDoc: Module: server</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: utils/urlHelper</h1>
+    <h1 class="page-title">Module: server</h1>
 
     
 
@@ -38,11 +38,19 @@
     <div class="container-overview">
     
         
-            <div class="description"><p>URL construction helpers for the MuzaLife backend.</p>
-<p>Utility functions for normalising resource URLs.  Relative paths stored in
-the database (e.g. <code>/uploads/products/image.jpg</code>) are converted to
-absolute URLs before they are sent to the client, so the frontend never
-needs to know the server hostname.</p></div>
+            <div class="description"><p>MuzaLife backend server entry point.</p>
+<p>Configures and starts an HTTPS Express server.  All route modules are
+mounted here and a Swagger UI is exposed at <code>/api/docs</code> for interactive
+API testing.</p>
+<p><strong>Architecture overview:</strong></p>
+<ul>
+<li>All routes are prefixed with <code>/api/</code>.</li>
+<li>Authentication is enforced per-route via the <code>authenticateToken</code>
+middleware (see <code>middleware/auth.js</code>).</li>
+<li>Static product files are served from the <code>uploads/</code> directory.</li>
+<li>HTTPS is mandatory even in development; certificates must exist in
+<code>certs/</code> before the server can start.</li>
+</ul></div>
         
 
         
@@ -91,7 +99,7 @@ needs to know the server hostname.</p></div>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_urlHelper.js.html">utils/urlHelper.js</a>, <a href="utils_urlHelper.js.html#line1">line 1</a>
+        <a href="server.js.html">server.js</a>, <a href="server.js.html#line1">line 1</a>
     </li></ul></dd>
     
 
@@ -137,94 +145,6 @@ needs to know the server hostname.</p></div>
 
     
 
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id=".constructFullUrl"><span class="type-signature">(static, constant) </span>constructFullUrl<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Builds a fully-qualified URL from a (possibly relative) image path.</p>
-<p>If <code>imagePath</code> is already absolute (<code>http://…</code> or <code>https://…</code>) it is
-returned unchanged.  Otherwise the protocol and host are taken from the
-current Express request object and prepended to the path.</p>
-<p><strong>Why this exists:</strong> product images are stored as relative paths in the
-database so the server can be deployed to any domain without a data
-migration.  This helper is called in every controller that returns image
-URLs to the client.</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_urlHelper.js.html">utils/urlHelper.js</a>, <a href="utils_urlHelper.js.html#line46">line 46</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-    <h5>Examples</h5>
-    
-    <pre class="prettyprint"><code>// Relative path → absolute URL
-constructFullUrl(req, '/uploads/products/42/cover.jpg');
-// => 'https://localhost:5001/uploads/products/42/cover.jpg'</code></pre>
-
-    <pre class="prettyprint"><code>// Already-absolute URL passed through unchanged
-constructFullUrl(req, 'https://cdn.example.com/image.png');
-// => 'https://cdn.example.com/image.png'</code></pre>
-
-    <pre class="prettyprint"><code>// Null/undefined → null
-constructFullUrl(req, null);
-// => null</code></pre>
-
-
-
-        
     
 
     

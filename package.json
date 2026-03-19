@@ -6,13 +6,23 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "setup-db": "node scripts/setupDatabase.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+
+    "test": "vitest run",
+    "test:docs": "vitest run tests/docs/",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:docs": "eslint . --rule 'jsdoc/require-jsdoc: warn'",
+
     "docs": "jsdoc -c jsdoc.json",
     "docs:clean": "rm -rf docs/jsdoc && npm run docs",
-    "check": "npm run lint",
+    "docs:archive": "zip -r /tmp/jsdoc_out.zip docs/jsdoc/ && cp /tmp/jsdoc_out.zip docs/jsdoc.zip && echo 'Archive: docs/jsdoc.zip'",
+    "docs:site": "vitepress dev docs-site",
+    "docs:site:build": "vitepress build docs-site",
+
+    "check": "npm run lint && npm run test:docs",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -44,6 +54,7 @@
     "husky": "^9.0.0",
     "jsdoc": "^4.0.5",
     "lint-staged": "^15.0.0",
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "vitest": "^4.1.0"
   }
 }

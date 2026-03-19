@@ -111,6 +111,69 @@ FACEBOOK_APP_SECRET=your__facebook_app_secret_here
 npm start
 </code></pre>
 <p>to start in production mode</p>
+<h2>Documentation</h2>
+<h3>Documentation standard</h3>
+<p>All public modules, controllers, services, middleware, and utility functions use <strong>JSDoc 3</strong> comments. Every contributor must follow the same standard to keep the generated reference up-to-date.</p>
+<p><strong>Minimum required tags for every exported symbol:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>@fileoverview</code> / <code>@module</code></td>
+<td>File-level description and module name</td>
+</tr>
+<tr>
+<td><code>@param {Type} name</code></td>
+<td>Each function parameter</td>
+</tr>
+<tr>
+<td><code>@returns {Type}</code></td>
+<td>Return value</td>
+</tr>
+<tr>
+<td><code>@throws {Type}</code></td>
+<td>Exceptions the function may throw</td>
+</tr>
+<tr>
+<td><code>@example</code></td>
+<td>At least one usage example</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Document in the description body (not just tags):</strong></p>
+<ul>
+<li>Why the function/class exists (architectural or business reason)</li>
+<li>Non-obvious algorithms (e.g. the two-step registration flow)</li>
+<li>Edge cases and their handling</li>
+</ul>
+<h3>Generating HTML docs</h3>
+<pre class="prettyprint source lang-bash"><code># Install dependencies (only needed once)
+npm install
+
+# Generate JSDoc HTML → docs/jsdoc/
+npm run docs
+
+# Clean output and regenerate
+npm run docs:clean
+</code></pre>
+<p>Open <code>docs/jsdoc/index.html</code> in a browser to browse the reference.</p>
+<h3>API documentation (Swagger UI)</h3>
+<p>The full OpenAPI 3.0 specification lives in <code>docs/api/openapi.yaml</code>.</p>
+<p>When the server is running, browse the <strong>interactive Swagger UI</strong> at:</p>
+<pre class="prettyprint source"><code>https://localhost:5001/api/docs
+</code></pre>
+<h3>Linting docs quality</h3>
+<pre class="prettyprint source lang-bash"><code>npm run lint
+</code></pre>
+<p>JSDoc-related warnings (<code>jsdoc/require-jsdoc</code>, <code>jsdoc/require-param</code>, etc.) indicate missing documentation. Fix all warnings before opening a Pull Request.</p>
+<h3>Detailed guide</h3>
+<p>See <a href="./docs/generate_docs.md"><code>docs/generate_docs.md</code></a> for the full documentation guide.</p>
+<hr>
 <h2>Contributing</h2>
 <p>Contributions are welcome! Follow these steps:</p>
 <ol>
@@ -141,7 +204,7 @@ npm start
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
 </nav>
 
 <br class="clear">
