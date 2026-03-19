@@ -1,4 +1,32 @@
-/**
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: services/emailService.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: services/emailService.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
  * @fileoverview SMTP email delivery service for MuzaLife.
  *
  * Wraps `nodemailer` to send transactional emails (currently only email
@@ -92,7 +120,7 @@ class EmailService {
    * Used primarily in integration tests to retrieve the code from the
    * rendered HTML without actually receiving the email.
    *
-   * **Algorithm:** searches for the first occurrence of `>NNNNNN<` where
+   * **Algorithm:** searches for the first occurrence of `>NNNNNN&lt;` where
    * `N` is a digit (matches the code rendered inside an HTML tag).
    *
    * @param {string} html - Raw HTML string of the email body.
@@ -100,11 +128,11 @@ class EmailService {
    *   pattern is absent.
    *
    * @example
-   * const code = emailService.extractVerificationCode('<h3>483920</h3>');
+   * const code = emailService.extractVerificationCode('&lt;h3>483920&lt;/h3>');
    * console.log(code); // '483920'
    */
   extractVerificationCode(html) {
-    const match = html.match(/>(\d{6})</);
+    const match = html.match(/>(\d{6})&lt;/);
     return match ? match[1] : 'Not found in HTML';
   }
 
@@ -119,7 +147,7 @@ class EmailService {
    * @param {string} verificationCode  - The 6-digit plain-text code to embed.
    * @param {string} [verification_type='registration'] - Context of the
    *   verification: `'registration'` (new account) or `'email_change'`.
-   * @returns {Promise<true>} Resolves with `true` on successful delivery.
+   * @returns {Promise&lt;true>} Resolves with `true` on successful delivery.
    * @throws {Error} Throws `'Failed to send verification email'` if nodemailer
    *   encounters a delivery error.
    *
@@ -133,43 +161,43 @@ class EmailService {
   async sendVerificationEmail(email, verificationCode, verification_type = 'registration') {
     try {
       const mailOptions = {
-        from: process.env.EMAIL_FROM || '"Muza Life" <noreply@muzalife.com>',
+        from: process.env.EMAIL_FROM || '"Muza Life" &lt;noreply@muzalife.com>',
         to: email,
         subject: verification_type === 'registration' ? 'Підтвердження електронної пошти - Muza Life' : 'Підтвердження зміни електронної пошти - Muza Life',
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #5e89e8;">Muza Life</h1>
-            </div>
+          &lt;div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            &lt;div style="text-align: center; margin-bottom: 30px;">
+              &lt;h1 style="color: #5e89e8;">Muza Life&lt;/h1>
+            &lt;/div>
 
-            <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;">
-              <h2 style="color: #333; margin-bottom: 20px;">Підтвердження електронної пошти</h2>
-              <p style="color: #666; margin-bottom: 30px; font-size: 16px;">
+            &lt;div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;">
+              &lt;h2 style="color: #333; margin-bottom: 20px;">Підтвердження електронної пошти&lt;/h2>
+              &lt;p style="color: #666; margin-bottom: 30px; font-size: 16px;">
                 ${verification_type === 'registration' ? 'Дякуємо за реєстрацію! Для завершення процесу, будь ласка, введіть наступний код підтвердження:'
                   : 'Для завершення зміни електронної пошти, будь ласка, введіть наступний код підтвердження:'}
-              </p>
+              &lt;/p>
 
-              <div style="background-color: white; padding: 20px; border-radius: 8px; border: 2px dashed #5e89e8; display: inline-block; margin: 20px 0;">
-                <h3 style="color: #5e89e8; font-size: 32px; letter-spacing: 10px; margin: 0; font-family: monospace;">
+              &lt;div style="background-color: white; padding: 20px; border-radius: 8px; border: 2px dashed #5e89e8; display: inline-block; margin: 20px 0;">
+                &lt;h3 style="color: #5e89e8; font-size: 32px; letter-spacing: 10px; margin: 0; font-family: monospace;">
                   ${verificationCode}
-                </h3>
-              </div>
+                &lt;/h3>
+              &lt;/div>
 
-              <p style="color: #999; font-size: 14px; margin-top: 20px;">
+              &lt;p style="color: #999; font-size: 14px; margin-top: 20px;">
                 Цей код дійсний протягом 15 хвилин.
-              </p>
+              &lt;/p>
 
-              <p style="color: #666; font-size: 14px; margin-top: 40px;">
+              &lt;p style="color: #666; font-size: 14px; margin-top: 40px;">
                 ${verification_type === 'registration' ? 'Якщо ви не реєструвались на Muza Life, просто проігноруйте цей лист.' : 'Якщо ви не змінювали електронну пошту на Muza Life, просто проігноруйте цей лист.'}
-              </p>
-            </div>
+              &lt;/p>
+            &lt;/div>
 
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-              <p style="color: #999; font-size: 12px;">
-                &copy; ${new Date().getFullYear()} Muza Life. Всі права захищені.
-              </p>
-            </div>
-          </div>
+            &lt;div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+              &lt;p style="color: #999; font-size: 12px;">
+                &amp;copy; ${new Date().getFullYear()} Muza Life. Всі права захищені.
+              &lt;/p>
+            &lt;/div>
+          &lt;/div>
         `,
         text: verification_type === 'registration' ? `Підтвердження електронної пошти для Muza Life\n\nВаш код підтвердження: ${verificationCode}\n\nЦей код дійсний протягом 15 хвилин.\n\nЯкщо ви не реєструвались, проігноруйте цей лист.` : `Підтвердження зміни електронної пошти для Muza Life\n\nВаш код підтвердження: ${verificationCode}\n\nЦей код дійсний протягом 15 хвилин.\n\nЯкщо ви не змінювали електронну пошту, проігноруйте цей лист.`
       };
@@ -190,3 +218,26 @@ class EmailService {
  * @type {EmailService}
  */
 export const emailService = new EmailService();
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a>
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

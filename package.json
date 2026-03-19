@@ -9,6 +9,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:docs": "eslint . --rule 'jsdoc/require-jsdoc: warn'",
+    "docs": "jsdoc -c jsdoc.json",
+    "docs:clean": "rm -rf docs/jsdoc && npm run docs",
     "check": "npm run lint",
     "prepare": "husky"
   },
@@ -25,17 +28,22 @@
     "express-validator": "^7.3.0",
     "googleapis": "^166.0.0",
     "helmet": "^7.2.0",
+    "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.12",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10",
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
+    "eslint-plugin-jsdoc": "^62.8.0",
     "globals": "^15.0.0",
     "husky": "^9.0.0",
-    "lint-staged": "^15.0.0"
+    "jsdoc": "^4.0.5",
+    "lint-staged": "^15.0.0",
+    "nodemon": "^3.1.10"
   }
 }

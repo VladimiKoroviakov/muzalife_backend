@@ -91,6 +91,65 @@ npm start
 ``` 
 to start in production mode
 
+## Documentation
+
+### Documentation standard
+
+All public modules, controllers, services, middleware, and utility functions use **JSDoc 3** comments. Every contributor must follow the same standard to keep the generated reference up-to-date.
+
+**Minimum required tags for every exported symbol:**
+
+| Tag | Purpose |
+|---|---|
+| `@fileoverview` / `@module` | File-level description and module name |
+| `@param {Type} name` | Each function parameter |
+| `@returns {Type}` | Return value |
+| `@throws {Type}` | Exceptions the function may throw |
+| `@example` | At least one usage example |
+
+**Document in the description body (not just tags):**
+- Why the function/class exists (architectural or business reason)
+- Non-obvious algorithms (e.g. the two-step registration flow)
+- Edge cases and their handling
+
+### Generating HTML docs
+
+```bash
+# Install dependencies (only needed once)
+npm install
+
+# Generate JSDoc HTML → docs/jsdoc/
+npm run docs
+
+# Clean output and regenerate
+npm run docs:clean
+```
+
+Open `docs/jsdoc/index.html` in a browser to browse the reference.
+
+### API documentation (Swagger UI)
+
+The full OpenAPI 3.0 specification lives in `docs/api/openapi.yaml`.
+
+When the server is running, browse the **interactive Swagger UI** at:
+```
+https://localhost:5001/api/docs
+```
+
+### Linting docs quality
+
+```bash
+npm run lint
+```
+
+JSDoc-related warnings (`jsdoc/require-jsdoc`, `jsdoc/require-param`, etc.) indicate missing documentation. Fix all warnings before opening a Pull Request.
+
+### Detailed guide
+
+See [`docs/generate_docs.md`](./docs/generate_docs.md) for the full documentation guide.
+
+---
+
 ## Contributing
 
 Contributions are welcome! Follow these steps:

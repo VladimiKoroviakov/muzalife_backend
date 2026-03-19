@@ -1,6 +1,7 @@
 // @ts-check
 import js from '@eslint/js';
 import globals from 'globals';
+import jsdoc from 'eslint-plugin-jsdoc';
 
 export default [
   // ─── Global ignores (replaces .eslintignore for ESLint v9) ───────────
@@ -11,12 +12,16 @@ export default [
       'certs/**',
       'dist/**',
       'coverage/**',
+      'docs/**',
       '**/*.min.js',
     ],
   },
   js.configs.recommended,
+  // ─── JSDoc linting (documentation quality enforcement) ───────────────
+  jsdoc.configs['flat/recommended'],
   {
     files: ['**/*.js'],
+    plugins: { jsdoc },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
@@ -26,6 +31,23 @@ export default [
       },
     },
     rules: {
+      // ─── JSDoc quality rules ─────────────────────────────────────────
+      'jsdoc/require-jsdoc': ['warn', {
+        require: {
+          FunctionDeclaration: true,
+          MethodDefinition: true,
+          ClassDeclaration: true,
+          ArrowFunctionExpression: false,
+          FunctionExpression: false,
+        },
+      }],
+      'jsdoc/require-description': 'warn',
+      'jsdoc/require-param': 'warn',
+      'jsdoc/require-param-description': 'warn',
+      'jsdoc/require-returns': 'warn',
+      'jsdoc/require-returns-description': 'warn',
+      'jsdoc/valid-types': 'warn',
+      'jsdoc/check-param-names': 'warn',
       // ─── Error prevention ───────────────────────────────────────────
       'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       'no-undef': 'error',

@@ -1,3 +1,21 @@
+/**
+ * @fileoverview MuzaLife backend server entry point.
+ *
+ * Configures and starts an HTTPS Express server.  All route modules are
+ * mounted here and a Swagger UI is exposed at `/api/docs` for interactive
+ * API testing.
+ *
+ * **Architecture overview:**
+ * - All routes are prefixed with `/api/`.
+ * - Authentication is enforced per-route via the `authenticateToken`
+ *   middleware (see `middleware/auth.js`).
+ * - Static product files are served from the `uploads/` directory.
+ * - HTTPS is mandatory even in development; certificates must exist in
+ *   `certs/` before the server can start.
+ *
+ * @module server
+ */
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -5,6 +23,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import https from 'https';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'js-yaml';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -56,6 +76,18 @@ app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
+
+// ── Swagger UI (interactive API documentation) ────────────────────────────
+const swaggerSpecPath = path.join(__dirname, 'docs', 'api', 'openapi.yaml');
+if (fs.existsSync(swaggerSpecPath)) {
+  const swaggerDocument = YAML.load(fs.readFileSync(swaggerSpecPath, 'utf8'));
+  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    customSiteTitle: 'MuzaLife API Docs',
+    swaggerOptions: { persistAuthorization: true },
+  }));
+  // eslint-disable-next-line no-console
+  console.log(`📖 Swagger UI available at: https://localhost:${process.env.PORT || 5001}/api/docs`);
+}
 
 // Routes
 app.use('/api/auth', authRoutes);

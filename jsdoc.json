@@ -1,0 +1,36 @@
+{
+  "source": {
+    "include": [
+      "server.js",
+      "config",
+      "controllers",
+      "middleware",
+      "routes",
+      "services",
+      "utils"
+    ],
+    "exclude": ["node_modules", "uploads", "certs", "scripts"],
+    "includePattern": ".+\\.js$",
+    "excludePattern": "(^|\\/|\\\\)_"
+  },
+  "opts": {
+    "destination": "./docs/jsdoc",
+    "recurse": true,
+    "readme": "README.md"
+  },
+  "plugins": ["plugins/markdown"],
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false,
+    "default": {
+      "outputSourceFiles": true,
+      "includeDate": false,
+      "useLongnameInNav": true,
+      "showInheritedInNav": true
+    }
+  },
+  "metadata": {
+    "title": "MuzaLife Backend API — JSDoc",
+    "description": "Auto-generated reference documentation for the MuzaLife back-end (Express / Node.js)."
+  }
+}
