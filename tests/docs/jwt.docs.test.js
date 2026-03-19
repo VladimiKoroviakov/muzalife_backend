@@ -1,5 +1,5 @@
 /**
- * @fileoverview Living documentation for {@link module:utils/jwt}.
+ * @file Living documentation for {@link module:utils/jwt}.
  *
  * These tests act as **executable documentation**: each `it()` block is a
  * human-readable specification of how the JWT utilities behave.  Reading the
@@ -9,18 +9,13 @@
  *
  * Run with:
  *   npm run test:docs
- *
  * @module tests/docs/jwt.docs
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+// JWT_SECRET / JWT_EXPIRES_IN are injected by vitest.config.js `env` before
+// any module is loaded, so jwt.js captures the correct value at init time.
+import { describe, it, expect } from 'vitest';
 import { generateToken, verifyToken } from '../../utils/jwt.js';
-
-// Set a stable secret for all tests in this file
-beforeAll(() => {
-  process.env.JWT_SECRET = 'test-secret-for-living-docs';
-  process.env.JWT_EXPIRES_IN = '1h';
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // generateToken
@@ -92,7 +87,7 @@ describe('verifyToken(token)', () => {
 
   it('throws JsonWebTokenError for a tampered token', () => {
     const token = generateToken(1);
-    const tampered = token.slice(0, -5) + 'XXXXX'; // corrupt the signature
+    const tampered = `${token.slice(0, -5)  }XXXXX`; // corrupt the signature
 
     expect(() => verifyToken(tampered)).toThrow();
   });

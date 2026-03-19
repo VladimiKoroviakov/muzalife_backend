@@ -1,5 +1,5 @@
 /**
- * @fileoverview Vitest configuration for MuzaLife Backend.
+ * @file Vitest configuration for MuzaLife Backend.
  *
  * Two test suites are defined:
  *  - `unit`  — fast isolated unit tests in tests/unit/
@@ -14,6 +14,14 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // Environment variables injected before any module is loaded.
+    // jwt.js captures JWT_SECRET at module-init time, so setting it here
+    // (rather than in beforeAll) is the only reliable way to seed the value.
+    env: {
+      JWT_SECRET: 'test-secret-for-living-docs',
+      JWT_EXPIRES_IN: '1h',
+    },
+
     // Use Node environment (no DOM)
     environment: 'node',
 

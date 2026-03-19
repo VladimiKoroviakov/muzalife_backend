@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - name: ESLint (code + JSDoc)
         run: npm run lint
 
@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - name: Run living-documentation tests
         run: npm run test:docs
         env:
@@ -65,7 +65,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - name: Generate JSDoc HTML
         run: npm run docs
       - name: Create documentation archive
@@ -88,7 +88,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
       - name: Verify Node.js can parse all source files
         run: |
           for f in server.js config/*.js controllers/*.js middleware/*.js services/*.js utils/*.js; do
