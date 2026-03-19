@@ -1,6 +1,6 @@
 # .github/workflows/deploy-docs.yml
 #
-# Builds and deploys the MuzaLife Backend documentation to GitHub Pages.
+# Builds the MuzaLife Backend documentation (VitePress + JSDoc).
 #
 # Triggered on every push to main.  Also runnable manually via
 # Actions → "Run workflow".
@@ -10,9 +10,7 @@
 #   2. Run living-documentation tests (npm run test:docs)
 #   3. Build the VitePress site (docs-site/)
 #   4. Copy the JSDoc output into the built site as /jsdoc/
-#   5. Deploy to GitHub Pages (gh-pages branch)
-#
-# Deployed URL:  https://<owner>.github.io/muzalife-backend/
+#   5. Upload the built site as a Pages artifact (for manual review)
 
 name: Deploy Docs to GitHub Pages
 
@@ -21,13 +19,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Permissions needed for GitHub Pages deployment
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
-# Only one deploy at a time; cancel in-flight runs on new push
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -73,19 +67,9 @@ jobs:
           mkdir -p docs-site/.vitepress/dist/jsdoc
           cp -r docs/jsdoc/* docs-site/.vitepress/dist/jsdoc/
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload built docs artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: docs-site
           path: docs-site/.vitepress/dist
-
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          retention-days: 7
