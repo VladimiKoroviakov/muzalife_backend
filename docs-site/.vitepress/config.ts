@@ -2,7 +2,7 @@
  * VitePress configuration for the MuzaLife Backend documentation site.
  *
  * Deployed to GitHub Pages via .github/workflows/deploy-docs.yml.
- * Live at: https://vladimikoroviakov.github.io/muzalife_backend/
+ * Live at: https://<org>.github.io/muzalife-backend/
  *
  * Structure:
  *   /             — landing page (docs-site/index.md)
@@ -20,11 +20,12 @@ export default defineConfig({
   // ── Site metadata ─────────────────────────────────────────────────────────
   title: 'MuzaLife Backend',
   description: 'REST API documentation for the MuzaLife platform',
-  lang: 'uk',                     // primary language: Ukrainian
-  base: '/muzalife_backend/',     // must match GitHub repo name exactly
+  lang: 'uk',                    // primary language: Ukrainian
+  base: '/muzalife-backend/',    // adjust to match your GitHub repo name
 
   // ── Head tags ─────────────────────────────────────────────────────────────
   head: [
+    ['link', { rel: 'icon', href: '/favicon.ico' }],
     ['meta', { name: 'theme-color', content: '#646cff' }],
   ],
 
@@ -99,7 +100,7 @@ export default defineConfig({
     ],
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/VladimiKoroviakov/muzalife_backend' },
+      { icon: 'github', link: 'https://github.com/your-org/muzalife-backend' },
     ],
 
     footer: {

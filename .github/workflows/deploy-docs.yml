@@ -6,13 +6,13 @@
 # Actions → "Run workflow".
 #
 # What it does:
-#   1. Run living-documentation tests (npm run test:docs)
-#   2. Generate JSDoc HTML (npm run docs)
+#   1. Generate JSDoc HTML (npm run docs)
+#   2. Run living-documentation tests (npm run test:docs)
 #   3. Build the VitePress site (docs-site/)
 #   4. Copy the JSDoc output into the built site as /jsdoc/
-#   5. Deploy to GitHub Pages
+#   5. Deploy to GitHub Pages (gh-pages branch)
 #
-# Live at: https://vladimikoroviakov.github.io/muzalife_backend/
+# Deployed URL:  https://<owner>.github.io/muzalife-backend/
 
 name: Deploy Docs to GitHub Pages
 
@@ -21,11 +21,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Permissions needed for GitHub Pages deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Only one deploy at a time; cancel in-flight runs on new push
 concurrency:
   group: pages
   cancel-in-progress: true

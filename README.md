@@ -1,4 +1,7 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Node.js](https://img.shields.io/badge/Node.js-20.x-green)
+![Express](https://img.shields.io/badge/Express-4.x-lightgrey)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue)
 
 # MuzaLife Back End
 
@@ -14,86 +17,253 @@ This repository contains the source code for the server-side of the MuzaLife pro
 - Environment-based configuration for easy deployment
 - JWT Authentication & OAuth (Google, Facebook)
 - Database integration (PostgreSQL)
+- HTTPS-only server (self-signed certs for local development)
+- Swagger UI for interactive API documentation
 - Structured logging and error handling
 
 
 ## Getting Started
 
-Follow these steps to run the backend locally.
+Follow these steps to run the backend locally from a **fresh OS installation**.
 
-### Prerequisites
-- Node.js v16+
-- npm or yarn
-- Database setup (PostgreSQL)
+### 1. Install Prerequisites
 
-### Clone & Install
+| Tool | Version | Download |
+|---|---|---|
+| Node.js | v20 LTS | https://nodejs.org |
+| npm | comes with Node.js | — |
+| PostgreSQL | v15+ | https://www.postgresql.org/download |
+| Git | latest | https://git-scm.com |
+| mkcert *(optional, for HTTPS)* | latest | https://github.com/FiloSottile/mkcert |
 
-```
+> **Windows users:** install Node.js via the official installer or `winget install OpenJS.NodeJS.LTS`. Install PostgreSQL via the official installer and add `psql` to your PATH.
+
+> **macOS users:** `brew install node postgresql@15 mkcert`
+
+> **Linux (Ubuntu/Debian):** `sudo apt install nodejs npm postgresql`
+
+---
+
+### 2. Clone the Repository
+
+```bash
 git clone https://github.com/VladimiKoroviakov/muzalife_backend.git
 cd muzalife_backend
+```
+
+---
+
+### 3. Install Dependencies
+
+```bash
 npm install
 ```
+
+---
+
+### 4. Configure Environment Variables
+
+Copy the example below and create a `.env` file in the project root:
+
+```bash
+# Server
+PORT=5001
+
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=muzalife
+DB_USER=postgres
+DB_PASSWORD=your_db_password_here
+
+# Security
+JWT_SECRET=your_long_random_secret_here
+
+# URLs (must match your local setup)
+FRONTEND_URL=https://localhost:3000
+BACKEND_URL=https://localhost:5001
+
+# Payment (use sandbox keys for development)
+LIQPAY_PUBLIC_KEY=sandbox_your_public_key
+LIQPAY_PRIVATE_KEY=sandbox_your_private_key
+
+# SMTP (Gmail example — use App Password if 2FA is enabled)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password_here
+EMAIL_FROM="Muza Life" <noreply@muzalife.com>
+
+# OAuth
+FACEBOOK_APP_ID=your_facebook_app_id_here
+FACEBOOK_APP_SECRET=your_facebook_app_secret_here
+```
+
+> **Note:** Never commit `.env` to version control. It is already listed in `.gitignore`.
+
+---
+
+### 5. Set Up HTTPS Certificates
+
+The backend **requires** HTTPS even locally. Generate self-signed certificates for `localhost`:
+
+**Option A — using mkcert (recommended):**
+
+```bash
+# Install mkcert's local CA
+mkcert -install
+
+# Generate certs for localhost and place them in the certs/ directory
+mkcert -cert-file certs/localhost-cert.pem -key-file certs/localhost-key.pem localhost 127.0.0.1
+```
+
+**Option B — using OpenSSL:**
+
+```bash
+mkdir -p certs
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout certs/localhost-key.pem \
+  -out certs/localhost-cert.pem \
+  -subj "/CN=localhost"
+```
+
+> The server checks for `certs/localhost-key.pem` and `certs/localhost-cert.pem` at startup and exits if they are missing.
+
+---
+
+### 6. Set Up the Database
+
+**Step 6.1 — Start PostgreSQL**
+
+- **Windows:** PostgreSQL service usually starts automatically. Check via *Services* or run `pg_ctl start`.
+- **macOS:** `brew services start postgresql@15`
+- **Linux:** `sudo systemctl start postgresql`
+
+**Step 6.2 — Create the database**
+
+Connect to PostgreSQL as the superuser and create a database:
+
+```bash
+psql -U postgres -c "CREATE DATABASE muzalife;"
+```
+
+**Step 6.3 — Run the schema setup script**
+
+This creates all tables, indexes, and relationships defined in `scripts/setupDatabase.js`:
+
+```bash
+npm run setup-db
+```
+
+Expected output:
+```
+Connected to PostgreSQL
+Database 'muzalife' ensured
+Complete database schema created successfully
+Uploads directory created: .../uploads/products
+```
+
+---
+
+### 7. Run in Development Mode
+
+```bash
+npm run dev
+```
+
+The server starts at **https://localhost:5001** using `nodemon` (auto-restarts on file changes).
+
+Expected output:
+```
+🚀 Muza Life Backend Server running on port 5001
+📖 Swagger UI available at: https://localhost:5001/api/docs
+📍 Health check: https://localhost:5001/api/health
+```
+
+> Your browser may warn about the self-signed certificate. Accept the exception to proceed.
+
+---
+
+### 8. Verify the Installation
+
+Open the following endpoints to confirm everything works:
+
+| Endpoint | Expected response |
+|---|---|
+| `GET https://localhost:5001/api/health` | `{"status":"OK"}` |
+| `GET https://localhost:5001/api/test-db` | `{"status":"Database connected successfully",...}` |
+| `GET https://localhost:5001/api/docs` | Swagger UI |
 
 
 ## Project Structure
 
 ```
 /
-├── config/        # App configuration (DB setup + Multer if you want to serve files)
-├── controllers/   # Request handlers for routes
-├── middlewares/   # Express middlewares (auth, validation, logging, file uploads)
+├── certs/         # HTTPS certificates (not committed to git)
+├── config/        # App configuration (DB connection, Multer)
+├── controllers/   # Request handlers for each route group
+├── docs/          # Project documentation (API spec, deployment guides)
+│   ├── api/       # OpenAPI 3.0 spec (openapi.yaml)
+│   ├── jsdoc/     # Auto-generated JSDoc HTML reference
+│   ├── deployment.md
+│   ├── update.md
+│   └── backup.md
+├── middleware/    # Express middlewares (auth, file uploads)
 ├── routes/        # API route definitions
-├── scripts/       # Scripts for the intial databse setup (Adding all the tables & indexes)
-├── services/      # Business logic and external integrations (email, verification)
-├── utils/         # Utility functions (formatters, validators, JWT)
-├── server.js      # Server entry point (main file)
+├── scripts/       # Utility scripts (DB setup)
+├── services/      # Business logic & integrations (email, verification)
+├── uploads/       # User-uploaded files (not committed to git)
+├── utils/         # Utility functions (JWT, URL helpers)
+└── server.js      # Application entry point
 ```
+
+
+## NPM Scripts Reference
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start development server with hot-reload (nodemon) |
+| `npm start` | Start production server |
+| `npm run setup-db` | Create all database tables and indexes |
+| `npm test` | Run all unit tests (Vitest) |
+| `npm run test:coverage` | Run tests with coverage report |
+| `npm run lint` | Run ESLint |
+| `npm run lint:fix` | Run ESLint and auto-fix |
+| `npm run docs` | Generate JSDoc HTML → `docs/jsdoc/` |
+| `npm run docs:clean` | Clean and regenerate JSDoc |
+| `npm run check` | Run lint + doc tests (used by CI) |
 
 
 ## Configuration
 
-Environment Variables
+### Environment Variables Reference
 
-Create a `.env` file in the project root:
+| Variable | Required | Description |
+|---|---|---|
+| `PORT` | No | Server port (default: 5001) |
+| `DB_HOST` | Yes | PostgreSQL host |
+| `DB_PORT` | Yes | PostgreSQL port (default: 5432) |
+| `DB_NAME` | Yes | Database name |
+| `DB_USER` | Yes | Database user |
+| `DB_PASSWORD` | Yes | Database password |
+| `JWT_SECRET` | Yes | Secret for signing JWT tokens (min 32 chars) |
+| `FRONTEND_URL` | Yes | Frontend origin (for CORS) |
+| `BACKEND_URL` | Yes | Backend base URL |
+| `SMTP_HOST` | Yes | SMTP server hostname |
+| `SMTP_PORT` | Yes | SMTP port |
+| `SMTP_USER` | Yes | SMTP username/email |
+| `SMTP_PASSWORD` | Yes | SMTP password or App Password |
+| `EMAIL_FROM` | Yes | Sender name and address |
+| `FACEBOOK_APP_ID` | No | Facebook OAuth App ID |
+| `FACEBOOK_APP_SECRET` | No | Facebook OAuth App Secret |
+| `LIQPAY_PUBLIC_KEY` | No | LiqPay payment public key |
+| `LIQPAY_PRIVATE_KEY` | No | LiqPay payment private key |
 
-```
-PORT=your_localhost_port_here
-DB_HOST=localhost
-DB_PORT=your_db_port_here
-DB_NAME=muzalife
-DB_USER=your_db_user_here
-DB_PASSWORD=your_db_password_here
-JWT_SECRET=your_jwt_secret_here
-FRONTEND_URL=your_front_end_url_here
-BACKEND_URL=your_back_end_url_here
-
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=your_mail_service_port_here
-SMTP_SECURE=false
-SMTP_USER=your_mail_service_user_email_here
-SMTP_PASSWORD=your_mail_service_app_pawssword_here
-EMAIL_FROM="Muza Life" <noreply@muzalife.com>
-
-FACEBOOK_APP_ID=your_facebook_app_id_here
-FACEBOOK_APP_SECRET=your__facebook_app_secret_here
-```
-
-## Running the code
-
-Run `npm i` to install the dependencies (if you haven't done that already).
-
-Run `npm run dev` to start the development server.
-
-Run
-```
-npm run build
-npm start
-``` 
-to start in production mode
 
 ## Documentation
 
-### Documentation standard
+### Documentation Standard
 
 All public modules, controllers, services, middleware, and utility functions use **JSDoc 3** comments. Every contributor must follow the same standard to keep the generated reference up-to-date.
 
@@ -107,27 +277,16 @@ All public modules, controllers, services, middleware, and utility functions use
 | `@throws {Type}` | Exceptions the function may throw |
 | `@example` | At least one usage example |
 
-**Document in the description body (not just tags):**
-- Why the function/class exists (architectural or business reason)
-- Non-obvious algorithms (e.g. the two-step registration flow)
-- Edge cases and their handling
-
-### Generating HTML docs
+### Generating HTML Docs
 
 ```bash
-# Install dependencies (only needed once)
-npm install
-
-# Generate JSDoc HTML → docs/jsdoc/
-npm run docs
-
-# Clean output and regenerate
-npm run docs:clean
+npm run docs        # Generate to docs/jsdoc/
+npm run docs:clean  # Clean and regenerate
 ```
 
 Open `docs/jsdoc/index.html` in a browser to browse the reference.
 
-### API documentation (Swagger UI)
+### API Documentation (Swagger UI)
 
 The full OpenAPI 3.0 specification lives in `docs/api/openapi.yaml`.
 
@@ -136,28 +295,38 @@ When the server is running, browse the **interactive Swagger UI** at:
 https://localhost:5001/api/docs
 ```
 
-### Linting docs quality
+### Linting Docs Quality
 
 ```bash
 npm run lint
 ```
 
-JSDoc-related warnings (`jsdoc/require-jsdoc`, `jsdoc/require-param`, etc.) indicate missing documentation. Fix all warnings before opening a Pull Request.
+JSDoc-related warnings indicate missing documentation. Fix all warnings before opening a Pull Request.
 
-### Detailed guide
+### Detailed Guide
 
 See [`docs/generate_docs.md`](./docs/generate_docs.md) for the full documentation guide.
+
+---
+
+## Deployment
+
+See [`docs/deployment.md`](./docs/deployment.md) for the production deployment guide.
+
+See [`docs/update.md`](./docs/update.md) for the update and rollback procedures.
+
+See [`docs/backup.md`](./docs/backup.md) for the backup and restore procedures.
 
 ---
 
 ## Contributing
 
 Contributions are welcome! Follow these steps:
-1.	Fork it
-2.	Create your feature branch (git checkout -b feature/your-feature)
-3.	Commit your changes
-4.	Push to your branch
-5.	Open a Pull Request
+1. Fork it
+2. Create your feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes
+4. Push to your branch
+5. Open a Pull Request
 
 Please make sure your code follows existing style conventions and includes relevant tests when applicable.
 
