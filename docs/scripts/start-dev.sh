@@ -53,7 +53,13 @@ fi
 success "SSL certificates found"
 
 # ── 4. Load env vars and check DB ────────────────────────────────────────────
-set -a; source .env; set +a
+# Safe .env loader — reads values literally, no shell interpretation of $, &, etc.
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^[[:space:]]*#  ]] && continue   # skip comments
+  [[ -z "${line//[[:space:]]/}" ]] && continue    # skip blank lines
+  [[ "$line" =~ ^([^=]+)=(.*)$  ]] || continue
+  export "${BASH_REMATCH[1]}"="${BASH_REMATCH[2]}"
+done < .env
 
 DB_HOST="${DB_HOST:-localhost}"
 DB_PORT="${DB_PORT:-5432}"

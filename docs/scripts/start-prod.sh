@@ -81,7 +81,12 @@ echo -e "${GREEN}  MuzaLife Backend started in PROD mode    ${RESET}"
 echo -e "${GREEN}═══════════════════════════════════════════${RESET}"
 
 # Quick health check
-set -a; source .env; set +a
+while IFS= read -r line || [[ -n "$line" ]]; do
+  [[ "$line" =~ ^[[:space:]]*#  ]] && continue
+  [[ -z "${line//[[:space:]]/}" ]] && continue
+  [[ "$line" =~ ^([^=]+)=(.*)$  ]] || continue
+  export "${BASH_REMATCH[1]}"="${BASH_REMATCH[2]}"
+done < .env
 PORT="${PORT:-5001}"
 sleep 2
 if curl -sk "https://localhost:${PORT}/api/health" | grep -q "OK"; then
