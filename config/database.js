@@ -16,6 +16,7 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 import dotenv from 'dotenv';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -34,6 +35,19 @@ const pool = new Pool({
   database: process.env.DB_NAME || 'muzalife',
   password: process.env.DB_PASSWORD || 'password',
   port: process.env.DB_PORT || 5433,
+});
+
+// ── Pool event logging ────────────────────────────────────────────────────────
+pool.on('connect', () => {
+  logger.debug('New PostgreSQL connection acquired from pool', { module: 'config/database' });
+});
+
+pool.on('error', (err) => {
+  logger.error('Unexpected error on idle PostgreSQL client', {
+    module: 'config/database',
+    error: err.message,
+    stack: err.stack,
+  });
 });
 
 /**

@@ -15,6 +15,7 @@
  */
 
 import { verifyToken as jwtVerifyToken } from '../utils/jwt.js';
+import logger from '../utils/logger.js';
 
 /**
  * Express middleware that enforces JWT authentication.
@@ -53,14 +54,32 @@ export const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    logger.warn('Authentication failed: no token provided', {
+      module: 'middleware/auth',
+      requestId: req.requestId,
+      method: req.method,
+      url: req.originalUrl,
+    });
     return res.status(401).json({ error: 'Access token required' });
   }
 
   try {
     const decoded = jwtVerifyToken(token);
     req.userId = decoded.userId;
+    logger.debug('Token verified successfully', {
+      module: 'middleware/auth',
+      requestId: req.requestId,
+      userId: decoded.userId,
+    });
     next();
-  } catch {
+  } catch (err) {
+    logger.warn('Authentication failed: invalid or expired token', {
+      module: 'middleware/auth',
+      requestId: req.requestId,
+      method: req.method,
+      url: req.originalUrl,
+      reason: err.message,
+    });
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 };

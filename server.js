@@ -12,6 +12,11 @@
  * - Static product files are served from the `uploads/` directory.
  * - HTTPS is mandatory even in development; certificates must exist in
  *   `certs/` before the server can start.
+ * - All HTTP traffic is logged via {@link module:middleware/requestLogger}.
+ * - All errors are handled by {@link module:middleware/errorHandler}.
+ *
+ * **Log level** is controlled via the `LOG_LEVEL` environment variable
+ * (e.g. `LOG_LEVEL=debug node server.js`) — no recompilation needed.
  *
  * @module server
  */
@@ -26,6 +31,10 @@ import https from 'https';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'js-yaml';
 
+import logger from './utils/logger.js';
+import { requestLogger } from './middleware/requestLogger.js';
+import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
+
 // Import routes
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
@@ -38,10 +47,12 @@ import pollRoutes from './routes/polls.js';
 import analytics from './routes/analytics.js';
 import personalOrdersRoutes from './routes/personalOrders.js';
 import boughtProductsRoutes from './routes/boughtProducts.js';
+import clientErrorsRouter from './routes/clientErrors.js';
 
 import { query } from './config/database.js';
 
 dotenv.config();
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 const __filename = fileURLToPath(import.meta.url);
@@ -49,8 +60,13 @@ const __dirname = path.dirname(__filename);
 const SSL_KEY_PATH = path.join(__dirname, 'certs', 'localhost-key.pem');
 const SSL_CERT_PATH = path.join(__dirname, 'certs', 'localhost-cert.pem');
 
+// ── SSL certificate guard ─────────────────────────────────────────────────────
 if (!fs.existsSync(SSL_KEY_PATH) || !fs.existsSync(SSL_CERT_PATH)) {
-  console.error('\n Missing HTTPS certificates!');
+  logger.critical('Missing HTTPS certificates — server cannot start', {
+    module: 'server',
+    keyPath: SSL_KEY_PATH,
+    certPath: SSL_CERT_PATH,
+  });
   process.exit(1);
 }
 
@@ -59,25 +75,23 @@ const sslOptions = {
   cert: fs.readFileSync(SSL_CERT_PATH),
 };
 
-// Middleware
+logger.info('SSL certificates loaded', { module: 'server' });
+
+// ── Core middleware ───────────────────────────────────────────────────────────
 app.use(cors({
   origin: 'https://localhost:3000',
   credentials: true,
 }));
 app.use(express.json());
 
-// Serve static files from uploads directory
+// ── Request logging (replaces the old console.log debug middleware) ───────────
+// Attaches req.requestId (UUID) and logs every request/response pair.
+app.use(requestLogger);
+
+// ── Static files ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Debug middleware — intentional request logger
-
-app.use((req, res, next) => {
-  // eslint-disable-next-line no-console
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  next();
-});
-
-// ── Swagger UI (interactive API documentation) ────────────────────────────
+// ── Swagger UI ────────────────────────────────────────────────────────────────
 const swaggerSpecPath = path.join(__dirname, 'docs', 'api', 'openapi.yaml');
 if (fs.existsSync(swaggerSpecPath)) {
   const swaggerDocument = YAML.load(fs.readFileSync(swaggerSpecPath, 'utf8'));
@@ -85,11 +99,13 @@ if (fs.existsSync(swaggerSpecPath)) {
     customSiteTitle: 'MuzaLife API Docs',
     swaggerOptions: { persistAuthorization: true },
   }));
-  // eslint-disable-next-line no-console
-  console.log(`📖 Swagger UI available at: https://localhost:${process.env.PORT || 5001}/api/docs`);
+  logger.info('Swagger UI mounted', {
+    module: 'server',
+    path: `/api/docs`,
+  });
 }
 
-// Routes
+// ── API routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/product-files', productFilesRoutes);
@@ -101,9 +117,13 @@ app.use('/api/polls', pollRoutes);
 app.use('/api/analytics', analytics);
 app.use('/api/personal-orders', personalOrdersRoutes);
 app.use('/api/bought-products', boughtProductsRoutes);
+app.use('/api/errors/client', clientErrorsRouter);
 
-// Server info endpoint
+logger.info('All API route modules mounted', { module: 'server' });
+
+// ── Server info endpoint ──────────────────────────────────────────────────────
 app.get('/api/info', (req, res) => {
+  logger.debug('Server info requested', { module: 'server', requestId: req.requestId });
   res.json({
     name: 'Muza Life Backend API',
     version: '1.0.0',
@@ -190,21 +210,36 @@ app.get('/api/info', (req, res) => {
     metadata: {
       environment: process.env.NODE_ENV || 'development',
       port: PORT,
+      logLevel: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'debug' : 'info'),
       timestamp: new Date().toISOString()
     }
   });
 });
 
-// Database connection test endpoint
+// ── Database connection test endpoint ─────────────────────────────────────────
 app.get('/api/test-db', async (req, res) => {
+  logger.debug('Database connectivity test requested', {
+    module: 'server',
+    requestId: req.requestId,
+  });
   try {
     const result = await query('SELECT NOW() as current_time');
+    logger.info('Database connectivity test passed', {
+      module: 'server',
+      requestId: req.requestId,
+      dbTime: result.rows[0].current_time,
+    });
     res.json({
       status: 'Database connected successfully',
       currentTime: result.rows[0].current_time
     });
   } catch (error) {
-    console.error('Database connection error:', error);
+    logger.error('Database connectivity test failed', {
+      module: 'server',
+      requestId: req.requestId,
+      error: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       error: 'Database connection failed',
       details: error.message
@@ -212,8 +247,9 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// Basic health check route
+// ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
+  logger.debug('Health check requested', { module: 'server', requestId: req.requestId });
   res.json({
     status: 'OK',
     message: 'Muza Life Backend Server is running!',
@@ -222,81 +258,76 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 404 handler for undefined routes
-app.use('*', (req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    message: `The route ${req.originalUrl} does not exist`,
-    availableRoutes: [
-      'GET /api/health',
-      'GET /api/info',
-      'GET /api/test-db',
-      'POST /api/auth/register',
-      'POST /api/auth/login',
-      'POST /api/auth/google',
-      'POST /api/auth/facebook',
-      'GET /api/auth/me',
-      'GET /api/users/profile',
-      'GET /api/saved-products',
-      'GET /api/saved-products/ids',
-      'POST /api/saved-products',
-      'DELETE /api/saved-products/:productId',
-      'GET /api/saved-products/check/:productId',
-      'POST /api/products/:productId/upload',
-      'GET /api/products/:productId/files',
-      'DELETE /api/products/files/:fileId',
-      'GET /api/polls',
-      'GET /api/polls/:pollId',
-      'POST /api/polls',
-      'POST /api/polls/:pollId/vote',
-      'GET /api/polls/:pollId/results',
-      'PUT /api/polls/:pollId/status',
-    ]
+// ── 404 handler (must be before globalErrorHandler) ───────────────────────────
+app.use('*', notFoundHandler);
+
+// ── Global error handler (must be last) ───────────────────────────────────────
+app.use(globalErrorHandler);
+
+// ── Start server ──────────────────────────────────────────────────────────────
+const server = https.createServer(sslOptions, app);
+
+server.listen(PORT, () => {
+  logger.info('MuzaLife backend server started', {
+    module: 'server',
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development',
+    logLevel: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'debug' : 'info'),
+    https: true,
+    swagger: fs.existsSync(swaggerSpecPath),
   });
-});
 
-// Global error handler
-app.use((error, req, res, _next) => {
-  console.error('Global error handler:', error);
-
-  // Handle multer file upload errors
-  if (error.code === 'LIMIT_FILE_SIZE') {
-    return res.status(400).json({
-      error: 'File too large',
-      message: 'File size must be less than 50MB'
-    });
-  }
-
-  if (error.message.includes('Invalid file type')) {
-    return res.status(400).json({
-      error: 'Invalid file type',
-      message: error.message
-    });
-  }
-
-  res.status(500).json({
-    error: 'Internal server error',
-    message: 'Something went wrong on the server'
-  });
-});
-
-/* eslint-disable no-console */
-https.createServer(sslOptions, app).listen(PORT, () => {
+  /* eslint-disable no-console */
   console.log(`🚀 Muza Life Backend Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📍 API Documentation: http://localhost:${PORT}/api/info`);
-  console.log(`📍 Database test: http://localhost:${PORT}/api/test-db`);
+  console.log(`📍 Log level: ${process.env.LOG_LEVEL || (process.env.NODE_ENV === 'development' ? 'debug' : 'info')} (override with LOG_LEVEL=<level>)`);
+  console.log(`📍 Health check: https://localhost:${PORT}/api/health`);
+  console.log(`📍 API Documentation: https://localhost:${PORT}/api/info`);
+  console.log(`📍 Database test: https://localhost:${PORT}/api/test-db`);
   console.log('📍 Available endpoints:');
-  console.log(`   🔐 Auth: http://localhost:${PORT}/api/auth`);
-  console.log(`   👥 Users: http://localhost:${PORT}/api/users`);
-  console.log(`   📦 Products: http://localhost:${PORT}/api/products`);
-  console.log(`   💾 Saved Products: http://localhost:${PORT}/api/saved-products`);
-  console.log(`   📁 Product Files: http://localhost:${PORT}/api/product-files`);
-  console.log(`   ⭐ Reviews: http://localhost:${PORT}/api/reviews`);
-  console.log(`   ❓ FAQs: http://localhost:${PORT}/api/faqs`);
-  console.log(`   📊 Polls: http://localhost:${PORT}/api/polls`);
-  console.log(`📍 Static files serving from: http://localhost:${PORT}/uploads/`);
+  console.log(`   🔐 Auth: https://localhost:${PORT}/api/auth`);
+  console.log(`   👥 Users: https://localhost:${PORT}/api/users`);
+  console.log(`   📦 Products: https://localhost:${PORT}/api/products`);
+  console.log(`   💾 Saved Products: https://localhost:${PORT}/api/saved-products`);
+  console.log(`   📁 Product Files: https://localhost:${PORT}/api/product-files`);
+  console.log(`   ⭐ Reviews: https://localhost:${PORT}/api/reviews`);
+  console.log(`   ❓ FAQs: https://localhost:${PORT}/api/faqs`);
+  console.log(`   📊 Polls: https://localhost:${PORT}/api/polls`);
+  console.log(`📍 Static files serving from: https://localhost:${PORT}/uploads/`);
   console.log('══════════════════════════════════════════════════');
+  /* eslint-enable no-console */
 });
-/* eslint-enable no-console */
+
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+const shutdown = (signal) => {
+  logger.info(`Received ${signal} — shutting down gracefully`, { module: 'server' });
+  server.close(() => {
+    logger.info('HTTPS server closed', { module: 'server' });
+    process.exit(0);
+  });
+
+  // Force-exit if graceful shutdown takes too long
+  setTimeout(() => {
+    logger.critical('Graceful shutdown timed out — forcing exit', { module: 'server' });
+    process.exit(1);
+  }, 10_000);
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
+
+process.on('uncaughtException', (err) => {
+  logger.critical('Uncaught exception — server will exit', {
+    module: 'server',
+    error: err.message,
+    stack: err.stack,
+  });
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.critical('Unhandled promise rejection', {
+    module: 'server',
+    reason: String(reason),
+  });
+});

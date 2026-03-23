@@ -1,0 +1,225 @@
+/**
+ * @file Global error-handling middleware for MuzaLife Express server.
+ *
+ * **Responsibilities:**
+ * 1. Classifies errors as operational (AppError) or programming bugs.
+ * 2. Logs every error with full context: errorId, requestId, userId, stack,
+ *    duration, and any custom context attached to the error.
+ * 3. Sends a sanitised JSON response — no internal stack traces leak to clients.
+ * 4. Returns user-facing messages in both Ukrainian (uk) and English (en) via
+ *    the `errorMessages` localisation map.
+ *
+ * This middleware MUST be registered as the last `app.use()` call in server.js.
+ * @module middleware/errorHandler
+ */
+
+import { AppError } from '../utils/AppError.js';
+import { v4 as uuidv4 } from 'uuid';
+import logger from '../utils/logger.js';
+
+// ── Localised user-facing error messages ─────────────────────────────────────
+/**
+ * Maps errorCode → { uk, en } user-friendly messages.
+ * Technical details are intentionally omitted.
+ *
+ * @type {Object.<string, {uk: string, en: string}>}
+ */
+const errorMessages = {
+  VALIDATION_ERROR: {
+    uk: 'Невірні дані запиту. Перевірте введені дані та спробуйте ще раз.',
+    en: 'Invalid request data. Please check your input and try again.',
+  },
+  UNAUTHORIZED: {
+    uk: 'Необхідна автентифікація. Будь ласка, увійдіть до системи.',
+    en: 'Authentication required. Please sign in to continue.',
+  },
+  FORBIDDEN: {
+    uk: 'Доступ заборонено. У вас недостатньо прав для цієї дії.',
+    en: 'Access denied. You do not have permission to perform this action.',
+  },
+  NOT_FOUND: {
+    uk: 'Ресурс не знайдено. Можливо, він був видалений або ніколи не існував.',
+    en: 'Resource not found. It may have been deleted or never existed.',
+  },
+  CONFLICT: {
+    uk: 'Конфлікт даних. Ресурс вже існує або знаходиться в суперечливому стані.',
+    en: 'Data conflict. The resource already exists or is in a conflicting state.',
+  },
+  UNPROCESSABLE: {
+    uk: 'Запит не може бути оброблений через семантичні помилки.',
+    en: 'The request cannot be processed due to semantic errors.',
+  },
+  RATE_LIMIT_EXCEEDED: {
+    uk: 'Забагато запитів. Зачекайте трохи та спробуйте знову.',
+    en: 'Too many requests. Please wait a moment and try again.',
+  },
+  INTERNAL_ERROR: {
+    uk: 'Внутрішня помилка сервера. Ми вже працюємо над вирішенням.',
+    en: 'Internal server error. We are already working on a fix.',
+  },
+  EXTERNAL_SERVICE_ERROR: {
+    uk: 'Зовнішній сервіс тимчасово недоступний. Спробуйте пізніше.',
+    en: 'An external service is temporarily unavailable. Please try again later.',
+  },
+  SERVICE_UNAVAILABLE: {
+    uk: 'Сервіс тимчасово недоступний. Ведуться технічні роботи.',
+    en: 'Service temporarily unavailable. Maintenance is in progress.',
+  },
+  UNKNOWN_ERROR: {
+    uk: 'Сталася невідома помилка. Якщо проблема повторюється, зверніться до підтримки.',
+    en: 'An unknown error occurred. If the problem persists, please contact support.',
+  },
+};
+
+/**
+ * Returns localised user-facing messages for an error code.
+ * @param {string} code - Error code from `AppError.errorCode`.
+ * @returns {{ uk: string, en: string }}
+ */
+const getLocalizedMessage = (code) =>
+  errorMessages[code] ?? errorMessages.UNKNOWN_ERROR;
+
+// ── Global error handler ──────────────────────────────────────────────────────
+
+/**
+ * Express 4-argument error-handling middleware.
+ *
+ * Catches all errors passed via `next(err)` or thrown synchronously in async
+ * route handlers that are wrapped with an async error catcher.
+ *
+ * @param {Error}    err
+ * @param {object}   req
+ * @param {object}   res
+ * @param {Function} _next - Required 4th param for Express to recognise as error handler.
+ */
+// eslint-disable-next-line no-unused-vars
+export const globalErrorHandler = (err, req, res, _next) => {
+  // Normalise: if not already an AppError, extract statusCode / errorCode
+  const statusCode = err.statusCode ?? 500;
+  const errorCode = err.errorCode ?? 'INTERNAL_ERROR';
+  const errorId = err.errorId ?? uuidv4();
+  const isOperational = err instanceof AppError ? err.isOperational : false;
+
+  // ── Log the error ──────────────────────────────────────────────────────────
+  const logMeta = {
+    module: 'errorHandler',
+    errorId,
+    errorCode,
+    statusCode,
+    requestId: req.requestId,
+    method: req.method,
+    url: req.originalUrl,
+    userId: req.userId ?? null,
+    ip: req.ip,
+    isOperational,
+    context: err instanceof AppError ? (err.context ?? {}) : {},
+    stack: err.stack,
+    durationMs: req.startTime ? Date.now() - req.startTime : undefined,
+  };
+
+  if (!isOperational || statusCode >= 500) {
+    logger.error(`[${errorCode}] ${err.message}`, logMeta);
+  } else if (statusCode >= 400) {
+    logger.warn(`[${errorCode}] ${err.message}`, logMeta);
+  } else {
+    logger.info(`[${errorCode}] ${err.message}`, logMeta);
+  }
+
+  // ── Multer-specific overrides ─────────────────────────────────────────────
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      error: 'Файл завеликий / File too large',
+      errorCode: 'VALIDATION_ERROR',
+      errorId,
+      message: {
+        uk: 'Розмір файлу перевищує 50 МБ.',
+        en: 'File size exceeds 50 MB.',
+      },
+      hint: {
+        uk: 'Завантажте файл меншого розміру.',
+        en: 'Please upload a smaller file.',
+      },
+      supportInfo: `Error ID: ${errorId}. Please quote this when contacting support.`,
+    });
+  }
+
+  if (err.message?.includes('Invalid file type')) {
+    return res.status(400).json({
+      error: 'Invalid file type',
+      errorCode: 'VALIDATION_ERROR',
+      errorId,
+      message: {
+        uk: 'Недопустимий тип файлу.',
+        en: err.message,
+      },
+    });
+  }
+
+  // ── Generic localised response ────────────────────────────────────────────
+  const localized = getLocalizedMessage(errorCode);
+
+  const responseBody = {
+    error: errorCode,
+    errorId,
+    timestamp: new Date().toISOString(),
+    message: localized,          // localised user-facing messages { uk, en }
+    hint: {
+      uk: 'Якщо проблема повторюється, зверніться до підтримки, зазначивши Error ID.',
+      en: 'If the problem persists, contact support and quote the Error ID above.',
+    },
+    supportInfo: `Error ID: ${errorId}`,
+  };
+
+  // In development expose the raw technical message to speed up debugging
+  if (process.env.NODE_ENV === 'development') {
+    responseBody.devMessage = err.message;
+    responseBody.devContext = err instanceof AppError ? err.context : undefined;
+  }
+
+  res.status(statusCode).json(responseBody);
+};
+
+// ── 404 handler (unknown routes) ──────────────────────────────────────────────
+
+/**
+ * Catch-all handler for routes that don't match any registered path.
+ * @param {object}   req
+ * @param {object}   res
+ * @param {Function} _next - unused but required for Express middleware signature
+ */
+// eslint-disable-next-line no-unused-vars
+export const notFoundHandler = (req, res, _next) => {
+  const errorId = uuidv4();
+
+  logger.warn('Route not found', {
+    module: 'errorHandler',
+    errorId,
+    method: req.method,
+    url: req.originalUrl,
+    requestId: req.requestId,
+  });
+
+  const localized = getLocalizedMessage('NOT_FOUND');
+
+  res.status(404).json({
+    error: 'NOT_FOUND',
+    errorId,
+    timestamp: new Date().toISOString(),
+    message: localized,
+    hint: {
+      uk: 'Перевірте URL та спробуйте ще раз.',
+      en: 'Check the URL and try again.',
+    },
+    supportInfo: `Error ID: ${errorId}`,
+    availableRoutes: [
+      'GET /api/health',
+      'GET /api/info',
+      'GET /api/docs',
+      'POST /api/auth/register/initiate',
+      'POST /api/auth/register/verify',
+      'POST /api/auth/login',
+      'GET /api/products',
+      'GET /api/faqs',
+    ],
+  });
+};
