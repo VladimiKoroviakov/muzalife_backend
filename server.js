@@ -101,7 +101,7 @@ if (fs.existsSync(swaggerSpecPath)) {
   }));
   logger.info('Swagger UI mounted', {
     module: 'server',
-    path: `/api/docs`,
+    path: '/api/docs',
   });
 }
 
