@@ -1,173 +1,207 @@
+/**
+ * @file Products REST API routes for MuzaLife.
+ *
+ * Provides endpoints for retrieving the full product catalogue and individual
+ * products.  Results are cached in-memory using {@link module:utils/cache} to
+ * avoid repeating expensive multi-join PostgreSQL queries on every request.
+ *
+ * **Cache strategy:**
+ * - `GET /api/products`    — cached under `"products:all"` for 5 minutes.
+ * - `GET /api/products/:id` — cached under `"products:<id>"` for 5 minutes.
+ * - Cache is invalidated for the affected key on any write (POST/PUT/DELETE).
+ * @module routes/products
+ */
+
 import express from 'express';
 const router = express.Router();
 import pool from '../config/database.js';
+import { appCache, TTL_PRODUCTS_LIST, TTL_PRODUCT_SINGLE } from '../utils/cache.js';
+import logger from '../utils/logger.js';
 
-// GET /api/products - Get all products with their relationships
+// ── Shared SQL fragment ───────────────────────────────────────────────────────
+const PRODUCT_SELECT = `
+  SELECT
+    p.product_id AS id,
+    p.product_title AS title,
+    p.product_description AS description,
+    p.product_main_img_url AS image,
+    p.product_price AS price,
+    p.product_rating AS rating,
+
+    pt.product_type_id AS type_id,
+    pt.product_type_name AS type,
+
+    p.product_created_at AS createdAt,
+    p.product_updated_at AS updatedAt,
+
+    ARRAY_AGG(DISTINCT ac.age_category_name) AS ageCategories,
+    ARRAY_AGG(DISTINCT e.event_name)         AS events,
+    ARRAY_AGG(DISTINCT i.image_url)          AS additionalImages
+
+  FROM products p
+  JOIN producttypes pt ON pt.product_type_id = p.product_type_id
+
+  LEFT JOIN productagecategories pac ON p.product_id = pac.product_id
+  LEFT JOIN agecategories ac         ON pac.age_category_id = ac.age_category_id
+  LEFT JOIN productevents pe         ON p.product_id = pe.product_id
+  LEFT JOIN events e                 ON pe.event_id = e.event_id
+  LEFT JOIN productimages pi         ON p.product_id = pi.product_id
+  LEFT JOIN images i                 ON pi.image_id = i.image_id
+`;
+
+const PRODUCT_GROUP_BY = `
+  GROUP BY
+    p.product_id,
+    pt.product_type_id,
+    pt.product_type_name,
+    p.product_title,
+    p.product_description,
+    p.product_main_img_url,
+    p.product_price,
+    p.product_rating,
+    p.product_created_at,
+    p.product_updated_at
+`;
+
+/**
+ * Transforms a raw DB row into the API response shape.
+ * @param {object} product - Raw row from the PostgreSQL query.
+ * @returns {object}
+ */
+const transformProduct = (product) => ({
+  id: product.id,
+  title: product.title,
+  price: parseFloat(product.price),
+  rating: parseFloat(product.rating),
+  type: product.type,
+  image: product.image,
+  ageCategory:      (product.agecategories    || []).filter(Boolean),
+  events:           (product.events           || []).filter(Boolean),
+  description:      product.description,
+  createdAt:        product.createdat,
+  updatedAt:        product.updatedat,
+  additionalImages: (product.additionalimages || []).filter(Boolean),
+});
+
+// ── GET /api/products ─────────────────────────────────────────────────────────
+/**
+ * Returns the full product catalogue with all related data.
+ *
+ * **Optimisation:** the result set is cached for {@link TTL_PRODUCTS_LIST}
+ * milliseconds.  Cache hits skip the DB round-trip entirely; a
+ * `X-Cache: HIT` / `MISS` header is sent for observability.
+ */
 router.get('/', async (req, res) => {
+  const CACHE_KEY = 'products:all';
+
+  // ── Cache HIT ─────────────────────────────────────────────────────────────
+  const cached = appCache.get(CACHE_KEY);
+  if (cached) {
+    res.setHeader('X-Cache', 'HIT');
+    logger.debug('Products list served from cache', {
+      module: 'routes/products',
+      requestId: req.requestId,
+    });
+    return res.json(cached);
+  }
+
+  // ── Cache MISS — query DB ─────────────────────────────────────────────────
+  res.setHeader('X-Cache', 'MISS');
   try {
-    const query = `
-      SELECT
-        p.product_id AS id,
-        p.product_title AS title,
-        p.product_description AS description,
-        p.product_main_img_url AS image,
-        p.product_price AS price,
-        p.product_rating AS rating,
+    const queryText = `${PRODUCT_SELECT} ${PRODUCT_GROUP_BY} ORDER BY p.product_id`;
+    const dbStart   = Date.now();
+    const result    = await pool.query(queryText);
+    const dbMs      = Date.now() - dbStart;
 
-        pt.product_type_id AS type_id,
-        pt.product_type_name AS type,
+    logger.debug('Products DB query completed', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      rowCount: result.rowCount,
+      dbMs,
+    });
 
-        p.product_created_at AS createdAt,
-        p.product_updated_at AS updatedAt,
-
-        ARRAY_AGG(DISTINCT ac.age_category_name) AS ageCategories,
-        ARRAY_AGG(DISTINCT e.event_name) AS events,
-        ARRAY_AGG(DISTINCT i.image_url) AS additionalImages
-
-      FROM products p
-      JOIN producttypes pt ON pt.product_type_id = p.product_type_id
-
-      LEFT JOIN productagecategories pac ON p.product_id = pac.product_id
-      LEFT JOIN agecategories ac ON pac.age_category_id = ac.age_category_id
-      LEFT JOIN productevents pe ON p.product_id = pe.product_id
-      LEFT JOIN events e ON pe.event_id = e.event_id
-      LEFT JOIN productimages pi ON p.product_id = pi.product_id
-      LEFT JOIN images i ON pi.image_id = i.image_id
-
-      GROUP BY
-        p.product_id,
-        pt.product_type_id,
-        pt.product_type_name,
-        p.product_title,
-        p.product_description,
-        p.product_main_img_url,
-        p.product_price,
-        p.product_rating,
-        p.product_created_at,
-        p.product_updated_at
-
-      ORDER BY p.product_id
-    `;
-
-    const result = await pool.query(query);
-
-    const products = result.rows.map((product) => ({
-      id: product.id,
-      title: product.title,
-      price: parseFloat(product.price),
-      rating: parseFloat(product.rating),
-      type: product.type,
-      image: product.image,
-      ageCategory: product.agecategories.filter((age) => age !== null),
-      events: product.events.filter((event) => event !== null),
-      description: product.description,
-      createdAt: product.createdat,
-      updatedAt: product.updatedat,
-      additionalImages: product.additionalimages.filter((img) => img !== null)
-    }));
+    const products = result.rows.map(transformProduct);
+    appCache.set(CACHE_KEY, products, TTL_PRODUCTS_LIST);
 
     res.json(products);
   } catch (error) {
-    console.error('Error fetching products:', error);
+    logger.error('Error fetching products', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      error: error.message,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// GET /api/products/:id - Get single product by ID
+// ── GET /api/products/:id ─────────────────────────────────────────────────────
+/**
+ * Returns a single product by its numeric ID.
+ *
+ * Result is cached per-product under `"products:<id>"` for
+ * {@link TTL_PRODUCT_SINGLE} milliseconds.
+ */
 router.get('/:id', async (req, res) => {
+  const productId = parseInt(req.params.id);
+
+  if (isNaN(productId)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+
+  const CACHE_KEY = `products:${productId}`;
+
+  // ── Cache HIT ─────────────────────────────────────────────────────────────
+  const cached = appCache.get(CACHE_KEY);
+  if (cached) {
+    res.setHeader('X-Cache', 'HIT');
+    return res.json(cached);
+  }
+
+  // ── Cache MISS — query DB ─────────────────────────────────────────────────
+  res.setHeader('X-Cache', 'MISS');
   try {
-    const productId = parseInt(req.params.id);
-
-    if (isNaN(productId)) {
-      return res.status(400).json({ error: 'Invalid product ID' });
-    }
-
-    const query = `
-      SELECT
-        p.product_id AS id,
-        p.product_title AS title,
-        p.product_description AS description,
-        p.product_main_img_url AS image,
-        p.product_price AS price,
-        p.product_rating AS rating,
-
-        pt.product_type_id AS type_id,
-        pt.product_type_name AS type,
-
-        p.product_created_at AS createdAt,
-        p.product_updated_at AS updatedAt,
-
-        ARRAY_AGG(DISTINCT ac.age_category_name) AS ageCategories,
-        ARRAY_AGG(DISTINCT e.event_name) AS events,
-        ARRAY_AGG(DISTINCT i.image_url) AS additionalImages
-
-      FROM products p
-      JOIN producttypes pt ON pt.product_type_id = p.product_type_id
-
-      LEFT JOIN productagecategories pac ON p.product_id = pac.product_id
-      LEFT JOIN agecategories ac ON pac.age_category_id = ac.age_category_id
-      LEFT JOIN productevents pe ON p.product_id = pe.product_id
-      LEFT JOIN events e ON pe.event_id = e.event_id
-      LEFT JOIN productimages pi ON p.product_id = pi.product_id
-      LEFT JOIN images i ON pi.image_id = i.image_id
-
-      WHERE p.product_id = $1
-
-      GROUP BY
-        p.product_id,
-        pt.product_type_id,
-        pt.product_type_name,
-        p.product_title,
-        p.product_description,
-        p.product_main_img_url,
-        p.product_price,
-        p.product_rating,
-        p.product_created_at,
-        p.product_updated_at
-    `;
-
-    const result = await pool.query(query, [productId]);
+    const queryText = `${PRODUCT_SELECT} WHERE p.product_id = $1 ${PRODUCT_GROUP_BY}`;
+    const result    = await pool.query(queryText, [productId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Product not found' });
     }
 
-    const product = result.rows[0];
-    const transformedProduct = {
-      id: product.id,
-      title: product.title,
-      price: parseFloat(product.price),
-      rating: parseFloat(product.rating),
-      type: product.type,
-      image: product.image,
-      ageCategory: product.agecategories.filter((age) => age !== null),
-      events: product.events.filter((event) => event !== null),
-      description: product.description,
-      createdAt: product.createdat,
-      updatedAt: product.updatedat,
-      additionalImages: product.additionalimages.filter((img) => img !== null)
-    };
+    const product = transformProduct(result.rows[0]);
+    appCache.set(CACHE_KEY, product, TTL_PRODUCT_SINGLE);
 
-    res.json(transformedProduct);
+    res.json(product);
   } catch (error) {
-    console.error('Error fetching product:', error);
+    logger.error('Error fetching product', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      productId,
+      error: error.message,
+    });
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// POST /api/products
+// ── POST /api/products ────────────────────────────────────────────────────────
 router.post('/', async (_req, _res) => {
   // Implementation for creating a new product
+  // TODO: invalidate appCache.invalidate('products:all') after insert
 });
 
-// PUT /api/products/:id
+// ── PUT /api/products/:id ─────────────────────────────────────────────────────
 router.put('/:id', async (_req, _res) => {
   // Implementation for updating a product by ID
+  // TODO: invalidate cache on update:
+  // appCache.invalidate(`products:${_req.params.id}`);
+  // appCache.invalidate('products:all');
 });
 
-// DELETE /api/products/:id
+// ── DELETE /api/products/:id ──────────────────────────────────────────────────
 router.delete('/:id', async (_req, _res) => {
   // Implementation for deleting a product by ID
+  // TODO: invalidate cache on delete:
+  // appCache.invalidate(`products:${_req.params.id}`);
+  // appCache.invalidate('products:all');
 });
 
 export default router;

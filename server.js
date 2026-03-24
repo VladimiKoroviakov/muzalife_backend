@@ -1,5 +1,5 @@
 /**
- * @fileoverview MuzaLife backend server entry point.
+ * @file MuzaLife backend server entry point.
  *
  * Configures and starts an HTTPS Express server.  All route modules are
  * mounted here and a Swagger UI is exposed at `/api/docs` for interactive
@@ -17,7 +17,6 @@
  *
  * **Log level** is controlled via the `LOG_LEVEL` environment variable
  * (e.g. `LOG_LEVEL=debug node server.js`) — no recompilation needed.
- *
  * @module server
  */
 
@@ -34,6 +33,7 @@ import YAML from 'js-yaml';
 import logger from './utils/logger.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { globalErrorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { performanceMonitor } from './middleware/performanceMonitor.js';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -48,6 +48,7 @@ import analytics from './routes/analytics.js';
 import personalOrdersRoutes from './routes/personalOrders.js';
 import boughtProductsRoutes from './routes/boughtProducts.js';
 import clientErrorsRouter from './routes/clientErrors.js';
+import apmRouter from './routes/apm.js';
 
 import { query } from './config/database.js';
 
@@ -88,6 +89,10 @@ app.use(express.json());
 // Attaches req.requestId (UUID) and logs every request/response pair.
 app.use(requestLogger);
 
+// ── Performance monitoring ────────────────────────────────────────────────────
+// Measures per-endpoint latency and records samples for the APM stats endpoint.
+app.use(performanceMonitor);
+
 // ── Static files ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -118,6 +123,7 @@ app.use('/api/analytics', analytics);
 app.use('/api/personal-orders', personalOrdersRoutes);
 app.use('/api/bought-products', boughtProductsRoutes);
 app.use('/api/errors/client', clientErrorsRouter);
+app.use('/api/apm', apmRouter);
 
 logger.info('All API route modules mounted', { module: 'server' });
 
