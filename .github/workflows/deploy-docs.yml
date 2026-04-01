@@ -58,9 +58,6 @@ jobs:
       - name: Create docs archive
         run: npm run docs:archive
 
-      - name: Install VitePress
-        run: npm install --save-dev vitepress
-
       - name: Build VitePress site
         run: npx vitepress build docs-site
         env:
@@ -70,6 +67,7 @@ jobs:
         run: |
           mkdir -p docs-site/.vitepress/dist/jsdoc
           cp -r docs/jsdoc/* docs-site/.vitepress/dist/jsdoc/
+          touch docs-site/.vitepress/dist/.nojekyll
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

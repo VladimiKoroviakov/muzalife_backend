@@ -54,6 +54,7 @@
     "jsdoc": "^4.0.5",
     "lint-staged": "^15.0.0",
     "nodemon": "^3.1.10",
+    "vitepress": "^1.6.4",
     "vitest": "^2.1.0"
   }
 }

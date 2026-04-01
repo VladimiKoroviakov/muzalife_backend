@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: routes/polls.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: routes/polls.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file Polls REST API routes for MuzaLife.
+ *
+ * Handles poll CRUD, user voting, and result aggregation.
+ *
+ * **Key fixes applied vs the original draft:**
+ * - All admin routes now read `req.userId` (set by `authenticateToken`) instead
+ *   of the non-existent `req.user.user_id`.
+ * - Added `GET /api/polls/results` — returns vote counts for **all** polls.
+ * @module routes/polls
+ */
+
+import express from 'express';
+import { query } from '../config/database.js';
+import { authenticateToken } from '../middleware/auth.js';
+
+const router = express.Router();
+
+// ── Helper: check if the authenticated user is admin ─────────────────────────
+const isAdmin = async (userId) => {
+  const result = await query(
+    'SELECT is_admin FROM Users WHERE user_id = $1',
+    [userId],
+  );
+  return result.rows[0]?.is_admin === true;
+};
+
+// ── GET /api/polls ────────────────────────────────────────────────────────────
+/**
+ * Returns all active polls, including per-option vote counts and whether the
+ * current user has already voted.
+ */
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const result = await query(`
+      SELECT
+        p.poll_id,
+        p.poll_question,
+        p.is_active,
+        p.poll_created_at,
+        COUNT(DISTINCT puv.user_id) as total_votes,
+        EXISTS(
+          SELECT 1 FROM PollUserVotes puv2
+          JOIN PollVotes pv2 ON puv2.vote_id = pv2.vote_id
+          WHERE pv2.poll_id = p.poll_id AND puv2.user_id = $1
+        ) as user_has_voted,
+        COALESCE(
+          jsonb_agg(
+            DISTINCT jsonb_build_object(
+              'vote_id', pv.vote_id,
+              'vote_text', pv.vote_text,
+              'vote_count', (
+                SELECT COUNT(*)
+                FROM PollUserVotes puv3
+                WHERE puv3.vote_id = pv.vote_id
+              )
+            )
+          ) FILTER (WHERE pv.vote_id IS NOT NULL),
+          '[]'::jsonb
+        ) as options
+      FROM Polls p
+      LEFT JOIN PollVotes pv ON p.poll_id = pv.poll_id
+      LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
+      WHERE p.is_active = true
+      GROUP BY p.poll_id, p.poll_question, p.is_active, p.poll_created_at
+      ORDER BY p.poll_created_at DESC
+    `, [userId]);
+
+    res.json({ success: true, polls: result.rows });
+  } catch (error) {
+    console.error('Error fetching polls:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch polls',
+      details: error.message,
+    });
+  }
+});
+
+// ── GET /api/polls/results ────────────────────────────────────────────────────
+/**
+ * Returns vote results for **all** polls (active and closed).
+ * Intended for the admin dashboard.
+ *
+ * Response shape:
+ * ```json
+ * {
+ *   "success": true,
+ *   "polls": [
+ *     {
+ *       "poll_id": 1,
+ *       "poll_question": "...",
+ *       "is_active": false,
+ *       "total_votes": 42,
+ *       "options": [
+ *         { "vote_id": 1, "vote_text": "Option A", "vote_count": 28, "percentage": "66.7" },
+ *         ...
+ *       ]
+ *     },
+ *     ...
+ *   ]
+ * }
+ * ```
+ */
+router.get('/results', async (req, res) => {
+  try {
+    // Fetch all polls
+    const pollsResult = await query(`
+      SELECT poll_id, poll_question, is_active, poll_created_at
+      FROM Polls
+      ORDER BY poll_created_at DESC
+    `);
+
+    const polls = await Promise.all(
+      pollsResult.rows.map(async (poll) => {
+        // Vote counts per option for this poll
+        const optionsResult = await query(`
+          SELECT
+            pv.vote_id,
+            pv.vote_text,
+            COUNT(puv.user_id) AS vote_count
+          FROM PollVotes pv
+          LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
+          WHERE pv.poll_id = $1
+          GROUP BY pv.vote_id, pv.vote_text
+          ORDER BY COUNT(puv.user_id) DESC, pv.vote_id ASC
+        `, [poll.poll_id]);
+
+        const totalVotes = optionsResult.rows.reduce(
+          (sum, row) => sum + parseInt(row.vote_count || 0, 10),
+          0,
+        );
+
+        const options = optionsResult.rows.map((row) => {
+          const count = parseInt(row.vote_count || 0, 10);
+          return {
+            vote_id:    row.vote_id,
+            vote_text:  row.vote_text,
+            vote_count: count,
+            percentage: totalVotes > 0
+              ? ((count / totalVotes) * 100).toFixed(1)
+              : '0.0',
+          };
+        });
+
+        return {
+          poll_id:       poll.poll_id,
+          poll_question: poll.poll_question,
+          is_active:     poll.is_active,
+          poll_created_at: poll.poll_created_at,
+          total_votes:   totalVotes,
+          options,
+        };
+      }),
+    );
+
+    res.json({ success: true, polls });
+  } catch (error) {
+    console.error('Error fetching all poll results:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch poll results',
+      details: error.message,
+    });
+  }
+});
+
+// ── GET /api/polls/:pollId ────────────────────────────────────────────────────
+/**
+ * Returns a single poll with its options, total votes, and the current user's
+ * vote (if any).
+ */
+router.get('/:pollId', authenticateToken, async (req, res) => {
+  try {
+    const { pollId } = req.params;
+    const userId = req.userId;
+
+    const pollResult = await query(`
+      SELECT
+        p.*,
+        COUNT(DISTINCT puv.user_id) as total_votes
+      FROM Polls p
+      LEFT JOIN PollVotes pv ON p.poll_id = pv.poll_id
+      LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
+      WHERE p.poll_id = $1
+      GROUP BY p.poll_id
+    `, [pollId]);
+
+    if (pollResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Poll not found' });
+    }
+
+    const optionsResult = await query(`
+      SELECT
+        pv.vote_id,
+        pv.vote_text,
+        COUNT(puv.user_id) as vote_count
+      FROM PollVotes pv
+      LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
+      WHERE pv.poll_id = $1
+      GROUP BY pv.vote_id, pv.vote_text
+      ORDER BY pv.vote_created_at
+    `, [pollId]);
+
+    let userVote      = null;
+    let user_has_voted = false;
+
+    if (userId) {
+      const userVoteResult = await query(`
+        SELECT puv.vote_id, pv.vote_text
+        FROM PollUserVotes puv
+        JOIN PollVotes pv ON puv.vote_id = pv.vote_id
+        WHERE pv.poll_id = $1 AND puv.user_id = $2
+      `, [pollId, userId]);
+
+      if (userVoteResult.rows.length > 0) {
+        user_has_voted = true;
+        userVote = userVoteResult.rows[0].vote_id;
+      }
+    }
+
+    const poll = {
+      ...pollResult.rows[0],
+      options: optionsResult.rows,
+      user_vote: userVote,
+      user_has_voted,
+    };
+
+    res.json({ success: true, poll });
+  } catch (error) {
+    console.error('Error fetching poll:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch poll',
+      details: error.message,
+    });
+  }
+});
+
+// ── POST /api/polls ───────────────────────────────────────────────────────────
+/**
+ * Creates a new poll with its vote options (admin only).
+ *
+ * Body: `{ poll_question: string, options: string[] }`  (minimum 2 options)
+ */
+router.post('/', authenticateToken, async (req, res) => {
+  try {
+    // req.userId is set by authenticateToken
+    const userId = req.userId;
+
+    if (!(await isAdmin(userId))) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only administrators can create polls',
+      });
+    }
+
+    const { poll_question, options } = req.body;
+
+    if (!poll_question || !Array.isArray(options) || options.length &lt; 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'poll_question is required and options must be an array with at least 2 items',
+      });
+    }
+
+    // Create the poll
+    const pollResult = await query(`
+      INSERT INTO Polls (poll_question, is_active)
+      VALUES ($1, true)
+      RETURNING *
+    `, [poll_question]);
+
+    const pollId = pollResult.rows[0].poll_id;
+
+    // Insert vote options
+    await Promise.all(
+      options.map((optionText) =>
+        query(
+          'INSERT INTO PollVotes (poll_id, vote_text) VALUES ($1, $2)',
+          [pollId, optionText],
+        ),
+      ),
+    );
+
+    res.status(201).json({ success: true, poll: pollResult.rows[0] });
+  } catch (error) {
+    console.error('Error creating poll:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create poll',
+      details: error.message,
+    });
+  }
+});
+
+// ── POST /api/polls/:pollId/vote ──────────────────────────────────────────────
+/**
+ * Records a vote for the authenticated user.
+ * Each user can vote only once per poll.
+ */
+router.post('/:pollId/vote', authenticateToken, async (req, res) => {
+  try {
+    const { pollId } = req.params;
+    const { vote_id } = req.body;
+    const userId = req.userId;
+
+    if (!vote_id) {
+      return res.status(400).json({ success: false, error: 'vote_id is required' });
+    }
+
+    // Poll must exist and be active
+    const pollCheck = await query(
+      'SELECT * FROM Polls WHERE poll_id = $1 AND is_active = true',
+      [pollId],
+    );
+
+    if (pollCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Poll not found or not active' });
+    }
+
+    // Vote option must belong to this poll
+    const voteCheck = await query(
+      'SELECT * FROM PollVotes WHERE vote_id = $1 AND poll_id = $2',
+      [vote_id, pollId],
+    );
+
+    if (voteCheck.rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'Invalid vote option for this poll' });
+    }
+
+    // Prevent duplicate votes
+    const existingVote = await query(`
+      SELECT puv.*
+      FROM PollUserVotes puv
+      JOIN PollVotes pv ON puv.vote_id = pv.vote_id
+      WHERE pv.poll_id = $1 AND puv.user_id = $2
+    `, [pollId, userId]);
+
+    if (existingVote.rows.length > 0) {
+      return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
+    }
+
+    await query(
+      'INSERT INTO PollUserVotes (vote_id, user_id) VALUES ($1, $2)',
+      [vote_id, userId],
+    );
+
+    res.json({ success: true, message: 'Vote recorded successfully' });
+  } catch (error) {
+    console.error('Error recording vote:', error);
+
+    if (error.code === '23505') {
+      return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to record vote',
+      details: error.message,
+    });
+  }
+});
+
+// ── GET /api/polls/:pollId/results ────────────────────────────────────────────
+/**
+ * Returns vote results for a single poll (public — no auth required).
+ */
+router.get('/:pollId/results', async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const pollCheck = await query('SELECT * FROM Polls WHERE poll_id = $1', [pollId]);
+
+    if (pollCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Poll not found' });
+    }
+
+    const result = await query(`
+      SELECT
+        pv.vote_id,
+        pv.vote_text,
+        COUNT(puv.user_id) as vote_count
+      FROM PollVotes pv
+      LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
+      WHERE pv.poll_id = $1
+      GROUP BY pv.vote_id, pv.vote_text
+      ORDER BY COUNT(puv.user_id) DESC, pv.vote_created_at ASC
+    `, [pollId]);
+
+    const totalVotes = result.rows.reduce(
+      (sum, row) => sum + parseInt(row.vote_count || 0, 10),
+      0,
+    );
+
+    const resultsWithPercentages = result.rows.map((row) => ({
+      vote_id:    row.vote_id,
+      vote_text:  row.vote_text,
+      vote_count: parseInt(row.vote_count || 0, 10),
+      percentage: totalVotes > 0
+        ? ((parseInt(row.vote_count || 0, 10) / totalVotes) * 100).toFixed(1)
+        : '0.0',
+    }));
+
+    res.json({
+      success:       true,
+      poll_id:       parseInt(pollId, 10),
+      poll_question: pollCheck.rows[0].poll_question,
+      results:       resultsWithPercentages,
+      total_votes:   totalVotes,
+      poll_active:   pollCheck.rows[0].is_active,
+    });
+  } catch (error) {
+    console.error('Error fetching poll results:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch poll results',
+      details: error.message,
+    });
+  }
+});
+
+// ── PUT /api/polls/:pollId/status ─────────────────────────────────────────────
+/**
+ * Activates or deactivates a poll (admin only).
+ *
+ * Body: `{ is_active: boolean }`
+ */
+router.put('/:pollId/status', authenticateToken, async (req, res) => {
+  try {
+    const { pollId } = req.params;
+    const { is_active } = req.body;
+
+    // req.userId is correctly set by authenticateToken
+    const userId = req.userId;
+
+    if (!(await isAdmin(userId))) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only administrators can update poll status',
+      });
+    }
+
+    if (typeof is_active !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'is_active must be a boolean',
+      });
+    }
+
+    const result = await query(`
+      UPDATE Polls SET is_active = $1 WHERE poll_id = $2 RETURNING *
+    `, [is_active, pollId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Poll not found' });
+    }
+
+    res.json({
+      success: true,
+      message: `Poll ${is_active ? 'activated' : 'deactivated'} successfully`,
+      poll:    result.rows[0],
+    });
+  } catch (error) {
+    console.error('Error updating poll status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update poll status',
+      details: error.message,
+    });
+  }
+});
+
+export default router;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_analytics.html">routes/analytics</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_polls.html">routes/polls</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a>
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

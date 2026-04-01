@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: server</title>
+    <title>JSDoc: Module: routes/analytics</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: server</h1>
+    <h1 class="page-title">Module: routes/analytics</h1>
 
     
 
@@ -38,23 +38,10 @@
     <div class="container-overview">
     
         
-            <div class="description"><p>MuzaLife backend server entry point.</p>
-<p>Configures and starts an HTTPS Express server.  All route modules are
-mounted here and a Swagger UI is exposed at <code>/api/docs</code> for interactive
-API testing.</p>
-<p><strong>Architecture overview:</strong></p>
-<ul>
-<li>All routes are prefixed with <code>/api/</code>.</li>
-<li>Authentication is enforced per-route via the <code>authenticateToken</code>
-middleware (see <code>middleware/auth.js</code>).</li>
-<li>Static product files are served from the <code>uploads/</code> directory.</li>
-<li>HTTPS is mandatory even in development; certificates must exist in
-<code>certs/</code> before the server can start.</li>
-<li>All HTTP traffic is logged via <a href="module-middleware_requestLogger.html">module:middleware/requestLogger</a>.</li>
-<li>All errors are handled by <a href="module-middleware_errorHandler.html">module:middleware/errorHandler</a>.</li>
-</ul>
-<p><strong>Log level</strong> is controlled via the <code>LOG_LEVEL</code> environment variable
-(e.g. <code>LOG_LEVEL=debug node server.js</code>) — no recompilation needed.</p></div>
+            <div class="description"><p>Analytics API routes for MuzaLife (admin only).</p>
+<p>Aggregates product engagement data — views, purchases, and saves — within
+an optional time window.  All endpoints require a valid JWT and admin
+privileges.</p></div>
         
 
         
@@ -103,7 +90,7 @@ middleware (see <code>middleware/auth.js</code>).</li>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="server.js.html">server.js</a>, <a href="server.js.html#line1">line 1</a>
+        <a href="routes_analytics.js.html">routes/analytics.js</a>, <a href="routes_analytics.js.html#line1">line 1</a>
     </li></ul></dd>
     
 
