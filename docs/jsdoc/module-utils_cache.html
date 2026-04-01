@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Global</title>
+    <title>JSDoc: Module: utils/cache</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Global</h1>
+    <h1 class="page-title">Module: utils/cache</h1>
 
     
 
@@ -28,7 +28,8 @@
 
 <header>
     
-        <h2></h2>
+        
+            
         
     
 </header>
@@ -37,8 +38,42 @@
     <div class="container-overview">
     
         
+            <div class="description"><p>In-memory TTL cache utility for MuzaLife backend.</p>
+<p>Provides a lightweight, dependency-free Map-based cache with per-entry
+time-to-live (TTL) support.  Intended for caching expensive database query
+results (e.g. full product catalogue, FAQ list) between requests.</p>
+<p><strong>Architecture:</strong> a single Cache class holds a <code>Map&lt;string, Entry&gt;</code>.
+Each entry stores the cached value and the timestamp at which it expires.
+Entries are lazily evicted on read; a periodic cleanup timer removes stale
+entries every CLEANUP_INTERVAL_MS milliseconds so memory does not
+grow unbounded.</p>
+<p><strong>Usage:</strong></p>
+<pre class="prettyprint source lang-js"><code>import { appCache } from '../utils/cache.js';
+
+// Store a value with a 5-minute TTL
+appCache.set('products:all', productsArray, 5 * 60 * 1000);
+
+// Retrieve (returns null if expired or missing)
+const cached = appCache.get('products:all');
+if (cached) return res.json(cached);
+</code></pre></div>
+        
 
         
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 <dl class="details">
@@ -68,6 +103,11 @@
     
 
     
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_cache.js.html">utils/cache.js</a>, <a href="utils_cache.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
 
     
 
@@ -75,6 +115,24 @@
 
     
 </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         
@@ -85,6 +143,13 @@
 
     
 
+    
+        <h3 class="subsection-title">Classes</h3>
+
+        <dl>
+            <dt><a href="module-utils_cache-Cache.html">Cache</a></dt>
+            <dd></dd>
+        </dl>
     
 
     
@@ -98,13 +163,13 @@
 
         
             
-<h4 class="name" id="changePassword"><span class="type-signature">(constant) </span>changePassword<span class="type-signature"></span></h4>
+<h4 class="name" id=".TTL_FAQS"><span class="type-signature">(static, constant) </span>TTL_FAQS<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Change password</p>
+    <p>TTL for the FAQ list (10 minutes — changes rarely).</p>
 </div>
 
 
@@ -142,7 +207,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line293">line 293</a>
+        <a href="utils_cache.js.html">utils/cache.js</a>, <a href="utils_cache.js.html#line167">line 167</a>
     </li></ul></dd>
     
 
@@ -160,13 +225,13 @@
 
         
             
-<h4 class="name" id="deleteAccount"><span class="type-signature">(constant) </span>deleteAccount<span class="type-signature"></span></h4>
+<h4 class="name" id=".TTL_POLLS"><span class="type-signature">(static, constant) </span>TTL_POLLS<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Delete user account</p>
+    <p>TTL for poll data (2 minutes — votes can come in quickly).</p>
 </div>
 
 
@@ -204,7 +269,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line407">line 407</a>
+        <a href="utils_cache.js.html">utils/cache.js</a>, <a href="utils_cache.js.html#line169">line 169</a>
     </li></ul></dd>
     
 
@@ -222,13 +287,13 @@
 
         
             
-<h4 class="name" id="getProfile"><span class="type-signature">(constant) </span>getProfile<span class="type-signature"></span></h4>
+<h4 class="name" id=".TTL_PRODUCTS_LIST"><span class="type-signature">(static, constant) </span>TTL_PRODUCTS_LIST<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Get user profile</p>
+    <p>TTL for the full product catalogue (5 minutes).</p>
 </div>
 
 
@@ -266,7 +331,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line16">line 16</a>
+        <a href="utils_cache.js.html">utils/cache.js</a>, <a href="utils_cache.js.html#line163">line 163</a>
     </li></ul></dd>
     
 
@@ -284,13 +349,13 @@
 
         
             
-<h4 class="name" id="initiateEmailChange"><span class="type-signature">(constant) </span>initiateEmailChange<span class="type-signature"></span></h4>
+<h4 class="name" id=".TTL_PRODUCT_SINGLE"><span class="type-signature">(static, constant) </span>TTL_PRODUCT_SINGLE<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Initiate email change</p>
+    <p>TTL for a single product by ID (5 minutes).</p>
 </div>
 
 
@@ -328,7 +393,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line88">line 88</a>
+        <a href="utils_cache.js.html">utils/cache.js</a>, <a href="utils_cache.js.html#line165">line 165</a>
     </li></ul></dd>
     
 
@@ -346,16 +411,27 @@
 
         
             
-<h4 class="name" id="removeProfileImage"><span class="type-signature">(constant) </span>removeProfileImage<span class="type-signature"></span></h4>
+<h4 class="name" id=".appCache"><span class="type-signature">(static, constant) </span>appCache<span class="type-signature"> :Cache</span></h4>
 
 
 
 
 <div class="description">
-    <p>Remove profile image</p>
+    <p>Shared application-wide cache instance.
+Import this singleton wherever caching is needed.</p>
 </div>
 
 
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Cache</span>
+
+
+        </li>
+    </ul>
 
 
 
@@ -390,7 +466,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line372">line 372</a>
+        <a href="utils_cache.js.html">utils/cache.js</a>, <a href="utils_cache.js.html#line159">line 159</a>
     </li></ul></dd>
     
 
@@ -408,13 +484,13 @@
 
         
             
-<h4 class="name" id="resendEmailChangeCode"><span class="type-signature">(constant) </span>resendEmailChangeCode<span class="type-signature"></span></h4>
+<h4 class="name" id="~CLEANUP_INTERVAL_MS"><span class="type-signature">(inner, constant) </span>CLEANUP_INTERVAL_MS<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Resend email change code</p>
+    <p>How often the background cleanup runs (ms).</p>
 </div>
 
 
@@ -452,255 +528,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line241">line 241</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="resendMaterial"><span class="type-signature">(constant) </span>resendMaterial<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Resend material</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line424">line 424</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="updateName"><span class="type-signature">(constant) </span>updateName<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Update user name</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line53">line 53</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="uploadProfileImage"><span class="type-signature">(constant) </span>uploadProfileImage<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Upload profile image</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line345">line 345</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="verifyEmailChange"><span class="type-signature">(constant) </span>verifyEmailChange<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Verify email change</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line168">line 168</a>
+        <a href="utils_cache.js.html">utils/cache.js</a>, <a href="utils_cache.js.html#line31">line 31</a>
     </li></ul></dd>
     
 

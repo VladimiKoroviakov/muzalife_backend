@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Module: middleware/performanceMonitor</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Module: middleware/performanceMonitor</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        
+            
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>Performance monitoring middleware for MuzaLife backend.</p>
+<p>Collects per-endpoint latency metrics, aggregates them in-memory, and
+exposes the summary via the APM stats endpoint (<code>GET /api/apm/stats</code>).</p>
+<p><strong>Architecture:</strong> metrics are stored in a plain JS Map keyed by
+<code>&quot;METHOD /route&quot;</code>.  Each bucket holds a rolling window of the last
+MAX_SAMPLES latency samples plus derived statistics (min, max,
+p50, p95, p99, avg, count).  No external dependency is required.</p>
+<p><strong>Integration:</strong> mount this middleware <strong>before</strong> route handlers so the
+full handler latency is captured.</p></div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id=".getMetricsSummary"><span class="type-signature">(static, constant) </span>getMetricsSummary<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Returns aggregated performance statistics for all observed routes.</p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line114">line 114</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// { route, count, errors, avg, min, max, p50, p95, p99 }</code></pre>
+
+
+
+        
+            
+<h4 class="name" id=".performanceMonitor"><span class="type-signature">(static, constant) </span>performanceMonitor<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Express middleware that measures response time for every HTTP request and
+records it into metricsStore.</p>
+<p>Attach with <code>app.use(performanceMonitor)</code> <strong>before</strong> all route handlers.</p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line82">line 82</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id=".resetMetrics"><span class="type-signature">(static, constant) </span>resetMetrics<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Resets all collected metrics (useful for tests).</p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line138">line 138</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="~MAX_SAMPLES"><span class="type-signature">(inner, constant) </span>MAX_SAMPLES<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Maximum latency samples retained per route bucket (rolling window).</p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line20">line 20</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id="~metricsStore"><span class="type-signature">(inner, constant) </span>metricsStore<span class="type-signature"> :Map.&lt;string, {samples: Array.&lt;number>, count: number, errors: number}></span></h4>
+
+
+
+
+<div class="description">
+    <p>In-memory metrics store.
+Key: <code>&quot;METHOD /normalised-path&quot;</code> (e.g. <code>&quot;GET /api/products&quot;</code>).</p>
+</div>
+
+
+
+    <h5>Type:</h5>
+    <ul>
+        <li>
+            
+<span class="param-type">Map.&lt;string, {samples: Array.&lt;number>, count: number, errors: number}></span>
+
+
+        </li>
+    </ul>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line27">line 27</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~normaliseKey"><span class="type-signature">(inner) </span>normaliseKey<span class="signature">(method, url)</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Returns a normalised route key from a raw URL by replacing numeric
+path segments with <code>:id</code> to group per-resource endpoints.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>method</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>HTTP verb.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>url</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Raw <code>req.originalUrl</code> value.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line36">line 36</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Normalised key, e.g. <code>&quot;GET /api/products/:id&quot;</code>.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~percentile"><span class="type-signature">(inner) </span>percentile<span class="signature">(sorted, p)</span><span class="type-signature"> &rarr; {number}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Computes p-th percentile of a sorted numeric array.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>sorted</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;number></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Ascending-sorted array.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>p</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Percentile 0–100.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line48">line 48</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">number</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~recordSample"><span class="type-signature">(inner) </span>recordSample<span class="signature">(key, durationMs, isError)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Records a latency sample for the given route key.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>key</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Normalised route key.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>durationMs</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Elapsed milliseconds.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>isError</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Whether the response was a server error (5xx).</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="middleware_performanceMonitor.js.html">middleware/performanceMonitor.js</a>, <a href="middleware_performanceMonitor.js.html#line60">line 60</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a>
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

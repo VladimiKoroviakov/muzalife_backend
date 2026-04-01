@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: middleware/auth.js</title>
+    <title>JSDoc: Class: ForbiddenError</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,105 +17,212 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: middleware/auth.js</h1>
+    <h1 class="page-title">Class: ForbiddenError</h1>
 
     
 
 
 
+
+<section>
+
+<header>
     
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>/**
- * @fileoverview Authentication middleware for the MuzaLife Express application.
- *
- * Provides Express middleware that validates JSON Web Tokens supplied in the
- * `Authorization: Bearer &lt;token>` header.  Verified tokens result in
- * `req.userId` being set so that downstream route handlers can identify the
- * caller without re-querying the database.
- *
- * **Interaction with other components:** this middleware depends on
- * {@link module:utils/jwt} for token verification and is mounted on every
- * protected route via `router.use(authenticateToken)` or applied
- * per-endpoint.
- *
- * @module middleware/auth
- */
+        <h2><span class="attribs"><span class="type-signature"></span></span>
+            <span class="ancestors"><a href="module-utils_AppError.html">utils/AppError</a>.</span>ForbiddenError<span class="signature">(message, context)</span><span class="type-signature"></span></h2>
+        
+            <div class="class-description"><p>403 Forbidden — authenticated but lacking permission.</p></div>
+        
+    
+</header>
 
-import { verifyToken as jwtVerifyToken } from '../utils/jwt.js';
-import logger from '../utils/logger.js';
+<article>
+    <div class="container-overview">
+    
+        
 
-/**
- * Express middleware that enforces JWT authentication.
- *
- * Reads the `Authorization` header, extracts the bearer token, and verifies
- * it using the application's JWT secret.  On success the decoded `userId` is
- * attached to `req` and `next()` is called.  On failure an appropriate HTTP
- * error response is returned immediately.
- *
- * **Business logic:** all stateful user actions (bookmarks, orders, reviews,
- * profile updates, …) require authentication.  Public endpoints such as
- * browsing products or reading FAQs do not use this middleware.
- *
- * @type {Function}
- *
- * @param {Object} req  - The incoming Express request.
- *   After successful verification `req.userId` is set to the numeric user ID.
- * @param {Object} res  - The Express response used to
- *   return 401 / 403 error payloads.
- * @param {Object} next - Called to pass control to
- *   the next middleware when authentication succeeds.
- * @returns {void}
- *
- * @example
- * // Apply to a single route
- * router.get('/profile', authenticateToken, (req, res) => {
- *   res.json({ userId: req.userId });
- * });
- *
- * @example
- * // Apply to all routes in a router
- * router.use(authenticateToken);
- */
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader &amp;&amp; authHeader.split(' ')[1];
+    
+    <h2>Constructor</h2>
+    
 
-  if (!token) {
-    logger.warn('Authentication failed: no token provided', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      method: req.method,
-      url: req.originalUrl,
-    });
-    return res.status(401).json({ error: 'Access token required' });
-  }
+    
+    <h4 class="name" id="ForbiddenError"><span class="type-signature"></span>new ForbiddenError<span class="signature">(message, context)</span><span class="type-signature"></span></h4>
+    
 
-  try {
-    const decoded = jwtVerifyToken(token);
-    req.userId = decoded.userId;
-    logger.debug('Token verified successfully', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      userId: decoded.userId,
-    });
-    next();
-  } catch (err) {
-    logger.warn('Authentication failed: invalid or expired token', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      method: req.method,
-      url: req.originalUrl,
-      reason: err.message,
-    });
-    return res.status(403).json({ error: 'Invalid or expired token' });
-  }
-};
+    
 
-export { jwtVerifyToken as verifyToken };
-</code></pre>
-        </article>
-    </section>
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>message</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    Access denied
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>context</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_AppError.js.html">utils/AppError.js</a>, <a href="utils_AppError.js.html#line99">line 99</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
 
 
 

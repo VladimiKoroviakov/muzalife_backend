@@ -1,10 +1,35 @@
+/**
+ * @file Polls REST API routes for MuzaLife.
+ *
+ * Handles poll CRUD, user voting, and result aggregation.
+ *
+ * **Key fixes applied vs the original draft:**
+ * - All admin routes now read `req.userId` (set by `authenticateToken`) instead
+ *   of the non-existent `req.user.user_id`.
+ * - Added `GET /api/polls/results` — returns vote counts for **all** polls.
+ * @module routes/polls
+ */
+
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all active polls
+// ── Helper: check if the authenticated user is admin ─────────────────────────
+const isAdmin = async (userId) => {
+  const result = await query(
+    'SELECT is_admin FROM Users WHERE user_id = $1',
+    [userId],
+  );
+  return result.rows[0]?.is_admin === true;
+};
+
+// ── GET /api/polls ────────────────────────────────────────────────────────────
+/**
+ * Returns all active polls, including per-option vote counts and whether the
+ * current user has already voted.
+ */
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId;
@@ -43,29 +68,115 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY p.poll_created_at DESC
     `, [userId]);
 
-    res.json({
-      success: true,
-      polls: result.rows
-    });
+    res.json({ success: true, polls: result.rows });
   } catch (error) {
     console.error('Error fetching polls:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch polls',
-      details: error.message
+      details: error.message,
     });
   }
 });
 
-// Get a specific poll with options and user vote (if authenticated)
+// ── GET /api/polls/results ────────────────────────────────────────────────────
+/**
+ * Returns vote results for **all** polls (active and closed).
+ * Intended for the admin dashboard.
+ *
+ * Response shape:
+ * ```json
+ * {
+ *   "success": true,
+ *   "polls": [
+ *     {
+ *       "poll_id": 1,
+ *       "poll_question": "...",
+ *       "is_active": false,
+ *       "total_votes": 42,
+ *       "options": [
+ *         { "vote_id": 1, "vote_text": "Option A", "vote_count": 28, "percentage": "66.7" },
+ *         ...
+ *       ]
+ *     },
+ *     ...
+ *   ]
+ * }
+ * ```
+ */
+router.get('/results', async (req, res) => {
+  try {
+    // Fetch all polls
+    const pollsResult = await query(`
+      SELECT poll_id, poll_question, is_active, poll_created_at
+      FROM Polls
+      ORDER BY poll_created_at DESC
+    `);
+
+    const polls = await Promise.all(
+      pollsResult.rows.map(async (poll) => {
+        // Vote counts per option for this poll
+        const optionsResult = await query(`
+          SELECT
+            pv.vote_id,
+            pv.vote_text,
+            COUNT(puv.user_id) AS vote_count
+          FROM PollVotes pv
+          LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
+          WHERE pv.poll_id = $1
+          GROUP BY pv.vote_id, pv.vote_text
+          ORDER BY COUNT(puv.user_id) DESC, pv.vote_id ASC
+        `, [poll.poll_id]);
+
+        const totalVotes = optionsResult.rows.reduce(
+          (sum, row) => sum + parseInt(row.vote_count || 0, 10),
+          0,
+        );
+
+        const options = optionsResult.rows.map((row) => {
+          const count = parseInt(row.vote_count || 0, 10);
+          return {
+            vote_id:    row.vote_id,
+            vote_text:  row.vote_text,
+            vote_count: count,
+            percentage: totalVotes > 0
+              ? ((count / totalVotes) * 100).toFixed(1)
+              : '0.0',
+          };
+        });
+
+        return {
+          poll_id:       poll.poll_id,
+          poll_question: poll.poll_question,
+          is_active:     poll.is_active,
+          poll_created_at: poll.poll_created_at,
+          total_votes:   totalVotes,
+          options,
+        };
+      }),
+    );
+
+    res.json({ success: true, polls });
+  } catch (error) {
+    console.error('Error fetching all poll results:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch poll results',
+      details: error.message,
+    });
+  }
+});
+
+// ── GET /api/polls/:pollId ────────────────────────────────────────────────────
+/**
+ * Returns a single poll with its options, total votes, and the current user's
+ * vote (if any).
+ */
 router.get('/:pollId', authenticateToken, async (req, res) => {
   try {
     const { pollId } = req.params;
     const userId = req.userId;
 
-    // debug: console.log(`Fetching poll ${pollId} for user ${userId}`);
-
-    // Get poll details with total votes
     const pollResult = await query(`
       SELECT
         p.*,
@@ -78,13 +189,9 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
     `, [pollId]);
 
     if (pollResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Poll not found'
-      });
+      return res.status(404).json({ success: false, error: 'Poll not found' });
     }
 
-    // Get poll options with individual vote counts
     const optionsResult = await query(`
       SELECT
         pv.vote_id,
@@ -97,15 +204,12 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
       ORDER BY pv.vote_created_at
     `, [pollId]);
 
-    // Check if current user has voted on this poll and get their vote
-    let userVote = null;
+    let userVote      = null;
     let user_has_voted = false;
 
     if (userId) {
       const userVoteResult = await query(`
-        SELECT
-          puv.vote_id,
-          pv.vote_text
+        SELECT puv.vote_id, pv.vote_text
         FROM PollUserVotes puv
         JOIN PollVotes pv ON puv.vote_id = pv.vote_id
         WHERE pv.poll_id = $1 AND puv.user_id = $2
@@ -117,241 +221,39 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
       }
     }
 
-    // Build the complete poll response
     const poll = {
       ...pollResult.rows[0],
       options: optionsResult.rows,
       user_vote: userVote,
-      user_has_voted
+      user_has_voted,
     };
 
-    res.json({
-      success: true,
-      poll
-    });
+    res.json({ success: true, poll });
   } catch (error) {
     console.error('Error fetching poll:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch poll',
-      details: error.message
+      details: error.message,
     });
   }
 });
 
-// Vote on a poll
-router.post('/:pollId/vote', authenticateToken, async (req, res) => {
-  try {
-    const { pollId } = req.params;
-    const { vote_id } = req.body;
-    const userId = req.userId;
-
-    // debug: console.log(`User ${userId} voting on poll ${pollId} for option ${vote_id}`);
-
-    if (!vote_id) {
-      return res.status(400).json({
-        success: false,
-        error: 'Vote ID is required'
-      });
-    }
-
-    // Check if poll exists and is active
-    const pollCheck = await query(`
-      SELECT * FROM Polls
-      WHERE poll_id = $1 AND is_active = true
-    `, [pollId]);
-
-    if (pollCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Poll not found or not active'
-      });
-    }
-
-    // Check if vote option exists AND belongs to this poll
-    const voteCheck = await query(`
-      SELECT * FROM PollVotes
-      WHERE vote_id = $1 AND poll_id = $2
-    `, [vote_id, pollId]);
-
-    if (voteCheck.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid vote option for this poll'
-      });
-    }
-
-    // Check if user has already voted on this poll
-    const existingVote = await query(`
-      SELECT puv.*
-      FROM PollUserVotes puv
-      JOIN PollVotes pv ON puv.vote_id = pv.vote_id
-      WHERE pv.poll_id = $1 AND puv.user_id = $2
-    `, [pollId, userId]);
-
-    if (existingVote.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'You have already voted on this poll'
-      });
-    }
-
-    // Record the vote (no poll_id in PollUserVotes table)
-    await query(`
-      INSERT INTO PollUserVotes (vote_id, user_id)
-      VALUES ($1, $2)
-    `, [vote_id, userId]);
-
-    res.json({
-      success: true,
-      message: 'Vote recorded successfully'
-    });
-  } catch (error) {
-    console.error('Error recording vote:', error);
-
-    // Check for duplicate vote constraint violation
-    if (error.code === '23505') { // PostgreSQL unique violation
-      return res.status(400).json({
-        success: false,
-        error: 'You have already voted on this poll'
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      error: 'Failed to record vote',
-      details: error.message
-    });
-  }
-});
-
-// Get poll results (vote counts for each option)
-router.get('/:pollId/results', async (req, res) => {
-  try {
-    const { pollId } = req.params;
-
-    // First check if poll exists
-    const pollCheck = await query(`
-      SELECT * FROM Polls WHERE poll_id = $1
-    `, [pollId]);
-
-    if (pollCheck.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Poll not found'
-      });
-    }
-
-    // Get all options for this poll with vote counts
-    const result = await query(`
-      SELECT
-        pv.vote_id,
-        pv.vote_text,
-        COUNT(puv.user_id) as vote_count
-      FROM PollVotes pv
-      LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
-      WHERE pv.poll_id = $1
-      GROUP BY pv.vote_id, pv.vote_text
-      ORDER BY
-        COUNT(puv.user_id) DESC,
-        pv.vote_created_at ASC
-    `, [pollId]);
-
-    // Calculate total votes
-    const totalVotes = result.rows.reduce((sum, row) => sum + parseInt(row.vote_count || 0), 0);
-
-    // Add percentages to each option
-    const resultsWithPercentages = result.rows.map((row) => ({
-      vote_id: row.vote_id,
-      vote_text: row.vote_text,
-      vote_count: parseInt(row.vote_count || 0),
-      percentage: totalVotes > 0
-        ? ((parseInt(row.vote_count || 0) / totalVotes) * 100).toFixed(1)
-        : '0.0'
-    }));
-
-    res.json({
-      success: true,
-      poll_id: parseInt(pollId),
-      poll_question: pollCheck.rows[0].poll_question,
-      results: resultsWithPercentages,
-      total_votes: totalVotes,
-      poll_active: pollCheck.rows[0].is_active
-    });
-  } catch (error) {
-    console.error('Error fetching poll results:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch poll results',
-      details: error.message
-    });
-  }
-});
-
-// Update poll status (admin only)
-router.put('/:pollId/status', authenticateToken, async (req, res) => {
-  try {
-    const { pollId } = req.params;
-    const { is_active } = req.body;
-    const userId = req.user.user_id;
-
-    // Check if user is admin
-    const userCheck = await query('SELECT is_admin FROM Users WHERE user_id = $1', [userId]);
-    if (!userCheck.rows[0]?.is_admin) {
-      return res.status(403).json({
-        success: false,
-        error: 'Only administrators can update poll status'
-      });
-    }
-
-    if (typeof is_active !== 'boolean') {
-      return res.status(400).json({
-        success: false,
-        error: 'is_active must be a boolean'
-      });
-    }
-
-    const result = await query(`
-      UPDATE Polls
-      SET is_active = $1
-      WHERE poll_id = $2
-      RETURNING *
-    `, [is_active, pollId]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'Poll not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `Poll ${is_active ? 'activated' : 'deactivated'} successfully`,
-      poll: result.rows[0]
-    });
-  } catch (error) {
-    console.error('Error updating poll status:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update poll status',
-      details: error.message
-    });
-  }
-});
-
-// ------- CHECK THIS ONE -------
-// Create a new poll (admin only)
+// ── POST /api/polls ───────────────────────────────────────────────────────────
+/**
+ * Creates a new poll with its vote options (admin only).
+ *
+ * Body: `{ poll_question: string, options: string[] }`  (minimum 2 options)
+ */
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.user_id;
+    // req.userId is set by authenticateToken
+    const userId = req.userId;
 
-    // Check if user is admin
-    const userCheck = await query('SELECT is_admin FROM Users WHERE user_id = $1', [userId]);
-    if (!userCheck.rows[0]?.is_admin) {
+    if (!(await isAdmin(userId))) {
       return res.status(403).json({
         success: false,
-        error: 'Only administrators can create polls'
+        error: 'Only administrators can create polls',
       });
     }
 
@@ -360,7 +262,7 @@ router.post('/', authenticateToken, async (req, res) => {
     if (!poll_question || !Array.isArray(options) || options.length < 2) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid poll question or options'
+        error: 'poll_question is required and options must be an array with at least 2 items',
       });
     }
 
@@ -373,26 +275,200 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const pollId = pollResult.rows[0].poll_id;
 
-    // Insert poll options
-    const insertOptionsPromises = options.map((optionText) => {
-      return query(`
-        INSERT INTO PollVotes (poll_id, vote_text)
-        VALUES ($1, $2)
-      `, [pollId, optionText]);
-    });
+    // Insert vote options
+    await Promise.all(
+      options.map((optionText) =>
+        query(
+          'INSERT INTO PollVotes (poll_id, vote_text) VALUES ($1, $2)',
+          [pollId, optionText],
+        ),
+      ),
+    );
 
-    await Promise.all(insertOptionsPromises);
-
-    res.status(201).json({
-      success: true,
-      poll: pollResult.rows[0]
-    });
+    res.status(201).json({ success: true, poll: pollResult.rows[0] });
   } catch (error) {
     console.error('Error creating poll:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to create poll',
-      details: error.message
+      details: error.message,
+    });
+  }
+});
+
+// ── POST /api/polls/:pollId/vote ──────────────────────────────────────────────
+/**
+ * Records a vote for the authenticated user.
+ * Each user can vote only once per poll.
+ */
+router.post('/:pollId/vote', authenticateToken, async (req, res) => {
+  try {
+    const { pollId } = req.params;
+    const { vote_id } = req.body;
+    const userId = req.userId;
+
+    if (!vote_id) {
+      return res.status(400).json({ success: false, error: 'vote_id is required' });
+    }
+
+    // Poll must exist and be active
+    const pollCheck = await query(
+      'SELECT * FROM Polls WHERE poll_id = $1 AND is_active = true',
+      [pollId],
+    );
+
+    if (pollCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Poll not found or not active' });
+    }
+
+    // Vote option must belong to this poll
+    const voteCheck = await query(
+      'SELECT * FROM PollVotes WHERE vote_id = $1 AND poll_id = $2',
+      [vote_id, pollId],
+    );
+
+    if (voteCheck.rows.length === 0) {
+      return res.status(400).json({ success: false, error: 'Invalid vote option for this poll' });
+    }
+
+    // Prevent duplicate votes
+    const existingVote = await query(`
+      SELECT puv.*
+      FROM PollUserVotes puv
+      JOIN PollVotes pv ON puv.vote_id = pv.vote_id
+      WHERE pv.poll_id = $1 AND puv.user_id = $2
+    `, [pollId, userId]);
+
+    if (existingVote.rows.length > 0) {
+      return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
+    }
+
+    await query(
+      'INSERT INTO PollUserVotes (vote_id, user_id) VALUES ($1, $2)',
+      [vote_id, userId],
+    );
+
+    res.json({ success: true, message: 'Vote recorded successfully' });
+  } catch (error) {
+    console.error('Error recording vote:', error);
+
+    if (error.code === '23505') {
+      return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Failed to record vote',
+      details: error.message,
+    });
+  }
+});
+
+// ── GET /api/polls/:pollId/results ────────────────────────────────────────────
+/**
+ * Returns vote results for a single poll (public — no auth required).
+ */
+router.get('/:pollId/results', async (req, res) => {
+  try {
+    const { pollId } = req.params;
+
+    const pollCheck = await query('SELECT * FROM Polls WHERE poll_id = $1', [pollId]);
+
+    if (pollCheck.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Poll not found' });
+    }
+
+    const result = await query(`
+      SELECT
+        pv.vote_id,
+        pv.vote_text,
+        COUNT(puv.user_id) as vote_count
+      FROM PollVotes pv
+      LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
+      WHERE pv.poll_id = $1
+      GROUP BY pv.vote_id, pv.vote_text
+      ORDER BY COUNT(puv.user_id) DESC, pv.vote_created_at ASC
+    `, [pollId]);
+
+    const totalVotes = result.rows.reduce(
+      (sum, row) => sum + parseInt(row.vote_count || 0, 10),
+      0,
+    );
+
+    const resultsWithPercentages = result.rows.map((row) => ({
+      vote_id:    row.vote_id,
+      vote_text:  row.vote_text,
+      vote_count: parseInt(row.vote_count || 0, 10),
+      percentage: totalVotes > 0
+        ? ((parseInt(row.vote_count || 0, 10) / totalVotes) * 100).toFixed(1)
+        : '0.0',
+    }));
+
+    res.json({
+      success:       true,
+      poll_id:       parseInt(pollId, 10),
+      poll_question: pollCheck.rows[0].poll_question,
+      results:       resultsWithPercentages,
+      total_votes:   totalVotes,
+      poll_active:   pollCheck.rows[0].is_active,
+    });
+  } catch (error) {
+    console.error('Error fetching poll results:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch poll results',
+      details: error.message,
+    });
+  }
+});
+
+// ── PUT /api/polls/:pollId/status ─────────────────────────────────────────────
+/**
+ * Activates or deactivates a poll (admin only).
+ *
+ * Body: `{ is_active: boolean }`
+ */
+router.put('/:pollId/status', authenticateToken, async (req, res) => {
+  try {
+    const { pollId } = req.params;
+    const { is_active } = req.body;
+
+    // req.userId is correctly set by authenticateToken
+    const userId = req.userId;
+
+    if (!(await isAdmin(userId))) {
+      return res.status(403).json({
+        success: false,
+        error: 'Only administrators can update poll status',
+      });
+    }
+
+    if (typeof is_active !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'is_active must be a boolean',
+      });
+    }
+
+    const result = await query(`
+      UPDATE Polls SET is_active = $1 WHERE poll_id = $2 RETURNING *
+    `, [is_active, pollId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Poll not found' });
+    }
+
+    res.json({
+      success: true,
+      message: `Poll ${is_active ? 'activated' : 'deactivated'} successfully`,
+      poll:    result.rows[0],
+    });
+  } catch (error) {
+    console.error('Error updating poll status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update poll status',
+      details: error.message,
     });
   }
 });

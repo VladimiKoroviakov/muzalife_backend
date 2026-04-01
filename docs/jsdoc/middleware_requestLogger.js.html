@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: middleware/auth.js</title>
+    <title>JSDoc: Source: middleware/requestLogger.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: middleware/auth.js</h1>
+    <h1 class="page-title">Source: middleware/requestLogger.js</h1>
 
     
 
@@ -27,92 +27,67 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>/**
- * @fileoverview Authentication middleware for the MuzaLife Express application.
+ * @file HTTP request/response logging middleware for MuzaLife.
  *
- * Provides Express middleware that validates JSON Web Tokens supplied in the
- * `Authorization: Bearer &lt;token>` header.  Verified tokens result in
- * `req.userId` being set so that downstream route handlers can identify the
- * caller without re-querying the database.
+ * Attaches a unique `X-Request-ID` header to every request, stores it on
+ * `req.requestId`, and logs each request/response pair with timing information.
  *
- * **Interaction with other components:** this middleware depends on
- * {@link module:utils/jwt} for token verification and is mounted on every
- * protected route via `router.use(authenticateToken)` or applied
- * per-endpoint.
+ * The request ID travels with the request through all layers (controllers,
+ * services, DB queries) so that all log entries for a single HTTP call share
+ * the same identifier — making log analysis and tracing trivial.
  *
- * @module middleware/auth
+ * **Context added to req:**
+ * - `req.requestId`  — UUID v4 unique per request
+ * - `req.startTime`  — high-resolution start timestamp (Date.now())
+ * @module middleware/requestLogger
  */
 
-import { verifyToken as jwtVerifyToken } from '../utils/jwt.js';
+import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger.js';
 
 /**
- * Express middleware that enforces JWT authentication.
- *
- * Reads the `Authorization` header, extracts the bearer token, and verifies
- * it using the application's JWT secret.  On success the decoded `userId` is
- * attached to `req` and `next()` is called.  On failure an appropriate HTTP
- * error response is returned immediately.
- *
- * **Business logic:** all stateful user actions (bookmarks, orders, reviews,
- * profile updates, …) require authentication.  Public endpoints such as
- * browsing products or reading FAQs do not use this middleware.
- *
- * @type {Function}
- *
- * @param {Object} req  - The incoming Express request.
- *   After successful verification `req.userId` is set to the numeric user ID.
- * @param {Object} res  - The Express response used to
- *   return 401 / 403 error payloads.
- * @param {Object} next - Called to pass control to
- *   the next middleware when authentication succeeds.
- * @returns {void}
- *
- * @example
- * // Apply to a single route
- * router.get('/profile', authenticateToken, (req, res) => {
- *   res.json({ userId: req.userId });
- * });
- *
- * @example
- * // Apply to all routes in a router
- * router.use(authenticateToken);
+ * Middleware that assigns a unique request ID and logs HTTP events.
+ * @param {object}   req  - Express request.
+ * @param {object}   res  - Express response.
+ * @param {Function} next - Next middleware.
  */
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader &amp;&amp; authHeader.split(' ')[1];
+export const requestLogger = (req, res, next) => {
+  // Honour forwarded request ID (e.g. from API gateway / load balancer)
+  req.requestId = req.headers['x-request-id'] || uuidv4();
+  req.startTime = Date.now();
 
-  if (!token) {
-    logger.warn('Authentication failed: no token provided', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      method: req.method,
-      url: req.originalUrl,
-    });
-    return res.status(401).json({ error: 'Access token required' });
-  }
+  // Propagate the ID back to the client so they can quote it in bug reports
+  res.setHeader('X-Request-ID', req.requestId);
 
-  try {
-    const decoded = jwtVerifyToken(token);
-    req.userId = decoded.userId;
-    logger.debug('Token verified successfully', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      userId: decoded.userId,
+  // Build log context shared by both request and response entries
+  const baseContext = {
+    module: 'http',
+    requestId: req.requestId,
+    method: req.method,
+    url: req.originalUrl,
+    ip: req.ip || req.socket?.remoteAddress,
+    userAgent: req.headers['user-agent'],
+  };
+
+  logger.http('Incoming request', baseContext);
+
+  // Hook into response finish to log the outcome
+  res.on('finish', () => {
+    const duration = Date.now() - req.startTime;
+    const level = res.statusCode >= 500 ? 'error'
+      : res.statusCode >= 400 ? 'warn'
+        : 'http';
+
+    logger[level]('Request completed', {
+      ...baseContext,
+      statusCode: res.statusCode,
+      durationMs: duration,
+      userId: req.userId ?? null,
     });
-    next();
-  } catch (err) {
-    logger.warn('Authentication failed: invalid or expired token', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      method: req.method,
-      url: req.originalUrl,
-      reason: err.message,
-    });
-    return res.status(403).json({ error: 'Invalid or expired token' });
-  }
+  });
+
+  next();
 };
-
-export { jwtVerifyToken as verifyToken };
 </code></pre>
         </article>
     </section>

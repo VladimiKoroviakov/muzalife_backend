@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: routes/products.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: routes/products.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file Products REST API routes for MuzaLife.
+ *
+ * Provides endpoints for retrieving the full product catalogue and individual
+ * products.  Results are cached in-memory using {@link module:utils/cache} to
+ * avoid repeating expensive multi-join PostgreSQL queries on every request.
+ *
+ * **Cache strategy:**
+ * - `GET /api/products`    — cached under `"products:all"` for 5 minutes.
+ * - `GET /api/products/:id` — cached under `"products:&lt;id>"` for 5 minutes.
+ * - Cache is invalidated for the affected key on any write (POST/PUT/DELETE).
+ * @module routes/products
+ */
+
+import express from 'express';
+const router = express.Router();
+import pool from '../config/database.js';
+import { appCache, TTL_PRODUCTS_LIST, TTL_PRODUCT_SINGLE } from '../utils/cache.js';
+import logger from '../utils/logger.js';
+
+// ── Shared SQL fragment ───────────────────────────────────────────────────────
+const PRODUCT_SELECT = `
+  SELECT
+    p.product_id AS id,
+    p.product_title AS title,
+    p.product_description AS description,
+    p.product_main_img_url AS image,
+    p.product_price AS price,
+    p.product_rating AS rating,
+
+    pt.product_type_id AS type_id,
+    pt.product_type_name AS type,
+
+    p.product_created_at AS createdAt,
+    p.product_updated_at AS updatedAt,
+
+    ARRAY_AGG(DISTINCT ac.age_category_name) AS ageCategories,
+    ARRAY_AGG(DISTINCT e.event_name)         AS events,
+    ARRAY_AGG(DISTINCT i.image_url)          AS additionalImages
+
+  FROM products p
+  JOIN producttypes pt ON pt.product_type_id = p.product_type_id
+
+  LEFT JOIN productagecategories pac ON p.product_id = pac.product_id
+  LEFT JOIN agecategories ac         ON pac.age_category_id = ac.age_category_id
+  LEFT JOIN productevents pe         ON p.product_id = pe.product_id
+  LEFT JOIN events e                 ON pe.event_id = e.event_id
+  LEFT JOIN productimages pi         ON p.product_id = pi.product_id
+  LEFT JOIN images i                 ON pi.image_id = i.image_id
+`;
+
+const PRODUCT_GROUP_BY = `
+  GROUP BY
+    p.product_id,
+    pt.product_type_id,
+    pt.product_type_name,
+    p.product_title,
+    p.product_description,
+    p.product_main_img_url,
+    p.product_price,
+    p.product_rating,
+    p.product_created_at,
+    p.product_updated_at
+`;
+
+/**
+ * Transforms a raw DB row into the API response shape.
+ * @param {object} product - Raw row from the PostgreSQL query.
+ * @returns {object}
+ */
+const transformProduct = (product) => ({
+  id: product.id,
+  title: product.title,
+  price: parseFloat(product.price),
+  rating: parseFloat(product.rating),
+  type: product.type,
+  image: product.image,
+  ageCategory:      (product.agecategories    || []).filter(Boolean),
+  events:           (product.events           || []).filter(Boolean),
+  description:      product.description,
+  createdAt:        product.createdat,
+  updatedAt:        product.updatedat,
+  additionalImages: (product.additionalimages || []).filter(Boolean),
+});
+
+// ── GET /api/products ─────────────────────────────────────────────────────────
+/**
+ * Returns the full product catalogue with all related data.
+ *
+ * **Optimisation:** the result set is cached for {@link TTL_PRODUCTS_LIST}
+ * milliseconds.  Cache hits skip the DB round-trip entirely; a
+ * `X-Cache: HIT` / `MISS` header is sent for observability.
+ */
+router.get('/', async (req, res) => {
+  const CACHE_KEY = 'products:all';
+
+  // ── Cache HIT ─────────────────────────────────────────────────────────────
+  const cached = appCache.get(CACHE_KEY);
+  if (cached) {
+    res.setHeader('X-Cache', 'HIT');
+    logger.debug('Products list served from cache', {
+      module: 'routes/products',
+      requestId: req.requestId,
+    });
+    return res.json(cached);
+  }
+
+  // ── Cache MISS — query DB ─────────────────────────────────────────────────
+  res.setHeader('X-Cache', 'MISS');
+  try {
+    const queryText = `${PRODUCT_SELECT} ${PRODUCT_GROUP_BY} ORDER BY p.product_id`;
+    const dbStart   = Date.now();
+    const result    = await pool.query(queryText);
+    const dbMs      = Date.now() - dbStart;
+
+    logger.debug('Products DB query completed', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      rowCount: result.rowCount,
+      dbMs,
+    });
+
+    const products = result.rows.map(transformProduct);
+    appCache.set(CACHE_KEY, products, TTL_PRODUCTS_LIST);
+
+    res.json(products);
+  } catch (error) {
+    logger.error('Error fetching products', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      error: error.message,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── GET /api/products/:id ─────────────────────────────────────────────────────
+/**
+ * Returns a single product by its numeric ID.
+ *
+ * Result is cached per-product under `"products:&lt;id>"` for
+ * {@link TTL_PRODUCT_SINGLE} milliseconds.
+ */
+router.get('/:id', async (req, res) => {
+  const productId = parseInt(req.params.id);
+
+  if (isNaN(productId)) {
+    return res.status(400).json({ error: 'Invalid product ID' });
+  }
+
+  const CACHE_KEY = `products:${productId}`;
+
+  // ── Cache HIT ─────────────────────────────────────────────────────────────
+  const cached = appCache.get(CACHE_KEY);
+  if (cached) {
+    res.setHeader('X-Cache', 'HIT');
+    return res.json(cached);
+  }
+
+  // ── Cache MISS — query DB ─────────────────────────────────────────────────
+  res.setHeader('X-Cache', 'MISS');
+  try {
+    const queryText = `${PRODUCT_SELECT} WHERE p.product_id = $1 ${PRODUCT_GROUP_BY}`;
+    const result    = await pool.query(queryText, [productId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    const product = transformProduct(result.rows[0]);
+    appCache.set(CACHE_KEY, product, TTL_PRODUCT_SINGLE);
+
+    res.json(product);
+  } catch (error) {
+    logger.error('Error fetching product', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      productId,
+      error: error.message,
+    });
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/products ────────────────────────────────────────────────────────
+router.post('/', async (_req, _res) => {
+  // Implementation for creating a new product
+  // TODO: invalidate appCache.invalidate('products:all') after insert
+});
+
+// ── PUT /api/products/:id ─────────────────────────────────────────────────────
+router.put('/:id', async (_req, _res) => {
+  // Implementation for updating a product by ID
+  // TODO: invalidate cache on update:
+  // appCache.invalidate(`products:${_req.params.id}`);
+  // appCache.invalidate('products:all');
+});
+
+// ── DELETE /api/products/:id ──────────────────────────────────────────────────
+router.delete('/:id', async (_req, _res) => {
+  // Implementation for deleting a product by ID
+  // TODO: invalidate cache on delete:
+  // appCache.invalidate(`products:${_req.params.id}`);
+  // appCache.invalidate('products:all');
+});
+
+export default router;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a>
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

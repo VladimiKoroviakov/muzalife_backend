@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Source: middleware/auth.js</title>
+    <title>JSDoc: Module: routes/clientErrors</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,105 +17,139 @@
 
 <div id="main">
 
-    <h1 class="page-title">Source: middleware/auth.js</h1>
+    <h1 class="page-title">Module: routes/clientErrors</h1>
 
     
 
 
 
+
+<section>
+
+<header>
     
-    <section>
-        <article>
-            <pre class="prettyprint source linenums"><code>/**
- * @fileoverview Authentication middleware for the MuzaLife Express application.
- *
- * Provides Express middleware that validates JSON Web Tokens supplied in the
- * `Authorization: Bearer &lt;token>` header.  Verified tokens result in
- * `req.userId` being set so that downstream route handlers can identify the
- * caller without re-querying the database.
- *
- * **Interaction with other components:** this middleware depends on
- * {@link module:utils/jwt} for token verification and is mounted on every
- * protected route via `router.use(authenticateToken)` or applied
- * per-endpoint.
- *
- * @module middleware/auth
- */
+        
+            
+        
+    
+</header>
 
-import { verifyToken as jwtVerifyToken } from '../utils/jwt.js';
-import logger from '../utils/logger.js';
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>Client-side error reporting endpoint.</p>
+<p>Receives structured error reports from the frontend JavaScript logger
+and writes them to the server-side Winston logger under the 'client-error'
+module tag.  This enables all frontend crashes to appear in the same
+centralised log stream as backend errors.</p>
+<p><strong>Endpoint:</strong> <code>POST /api/errors/client</code>
+<strong>Auth:</strong>     None required — errors can occur before the user is logged in.
+<strong>Rate limit:</strong> Consider adding express-rate-limit in production.</p></div>
+        
 
-/**
- * Express middleware that enforces JWT authentication.
- *
- * Reads the `Authorization` header, extracts the bearer token, and verifies
- * it using the application's JWT secret.  On success the decoded `userId` is
- * attached to `req` and `next()` is called.  On failure an appropriate HTTP
- * error response is returned immediately.
- *
- * **Business logic:** all stateful user actions (bookmarks, orders, reviews,
- * profile updates, …) require authentication.  Public endpoints such as
- * browsing products or reading FAQs do not use this middleware.
- *
- * @type {Function}
- *
- * @param {Object} req  - The incoming Express request.
- *   After successful verification `req.userId` is set to the numeric user ID.
- * @param {Object} res  - The Express response used to
- *   return 401 / 403 error payloads.
- * @param {Object} next - Called to pass control to
- *   the next middleware when authentication succeeds.
- * @returns {void}
- *
- * @example
- * // Apply to a single route
- * router.get('/profile', authenticateToken, (req, res) => {
- *   res.json({ userId: req.userId });
- * });
- *
- * @example
- * // Apply to all routes in a router
- * router.use(authenticateToken);
- */
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader &amp;&amp; authHeader.split(' ')[1];
+        
+            
 
-  if (!token) {
-    logger.warn('Authentication failed: no token provided', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      method: req.method,
-      url: req.originalUrl,
-    });
-    return res.status(401).json({ error: 'Access token required' });
-  }
 
-  try {
-    const decoded = jwtVerifyToken(token);
-    req.userId = decoded.userId;
-    logger.debug('Token verified successfully', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      userId: decoded.userId,
-    });
-    next();
-  } catch (err) {
-    logger.warn('Authentication failed: invalid or expired token', {
-      module: 'middleware/auth',
-      requestId: req.requestId,
-      method: req.method,
-      url: req.originalUrl,
-      reason: err.message,
-    });
-    return res.status(403).json({ error: 'Invalid or expired token' });
-  }
-};
 
-export { jwtVerifyToken as verifyToken };
-</code></pre>
-        </article>
-    </section>
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="routes_clientErrors.js.html">routes/clientErrors.js</a>, <a href="routes_clientErrors.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
 
 
 

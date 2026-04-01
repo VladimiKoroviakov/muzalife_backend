@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: middleware/performanceMonitor.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: middleware/performanceMonitor.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file Performance monitoring middleware for MuzaLife backend.
+ *
+ * Collects per-endpoint latency metrics, aggregates them in-memory, and
+ * exposes the summary via the APM stats endpoint (`GET /api/apm/stats`).
+ *
+ * **Architecture:** metrics are stored in a plain JS Map keyed by
+ * `"METHOD /route"`.  Each bucket holds a rolling window of the last
+ * {@link MAX_SAMPLES} latency samples plus derived statistics (min, max,
+ * p50, p95, p99, avg, count).  No external dependency is required.
+ *
+ * **Integration:** mount this middleware **before** route handlers so the
+ * full handler latency is captured.
+ * @module middleware/performanceMonitor
+ */
+
+import logger from '../utils/logger.js';
+
+/** Maximum latency samples retained per route bucket (rolling window). */
+const MAX_SAMPLES = 500;
+
+/**
+ * In-memory metrics store.
+ * Key: `"METHOD /normalised-path"` (e.g. `"GET /api/products"`).
+ * @type {Map&lt;string, {samples: number[], count: number, errors: number}>}
+ */
+const metricsStore = new Map();
+
+/**
+ * Returns a normalised route key from a raw URL by replacing numeric
+ * path segments with `:id` to group per-resource endpoints.
+ * @param {string} method - HTTP verb.
+ * @param {string} url    - Raw `req.originalUrl` value.
+ * @returns {string} Normalised key, e.g. `"GET /api/products/:id"`.
+ */
+const normaliseKey = (method, url) => {
+  // Strip query string, then replace numeric segments with :id placeholder
+  const path = url.split('?')[0].replace(/\/\d+/g, '/:id');
+  return `${method} ${path}`;
+};
+
+/**
+ * Computes p-th percentile of a sorted numeric array.
+ * @param {number[]} sorted - Ascending-sorted array.
+ * @param {number}   p      - Percentile 0–100.
+ * @returns {number}
+ */
+const percentile = (sorted, p) => {
+  if (sorted.length === 0) {return 0;}
+  const idx = Math.ceil((p / 100) * sorted.length) - 1;
+  return sorted[Math.max(0, idx)];
+};
+
+/**
+ * Records a latency sample for the given route key.
+ * @param {string}  key       - Normalised route key.
+ * @param {number}  durationMs - Elapsed milliseconds.
+ * @param {boolean} isError   - Whether the response was a server error (5xx).
+ */
+const recordSample = (key, durationMs, isError) => {
+  if (!metricsStore.has(key)) {
+    metricsStore.set(key, { samples: [], count: 0, errors: 0 });
+  }
+  const bucket = metricsStore.get(key);
+  bucket.samples.push(durationMs);
+  if (bucket.samples.length > MAX_SAMPLES) {
+    bucket.samples.shift(); // keep rolling window
+  }
+  bucket.count += 1;
+  if (isError) {bucket.errors += 1;}
+};
+
+/**
+ * Express middleware that measures response time for every HTTP request and
+ * records it into {@link metricsStore}.
+ *
+ * Attach with `app.use(performanceMonitor)` **before** all route handlers.
+ * @param {object}   req  - Express request.
+ * @param {object}   res  - Express response.
+ * @param {Function} next - Next middleware in the chain.
+ */
+export const performanceMonitor = (req, res, next) => {
+  const start = process.hrtime.bigint(); // nanosecond precision
+
+  res.on('finish', () => {
+    const durationNs = process.hrtime.bigint() - start;
+    const durationMs = Number(durationNs) / 1_000_000;
+    const key = normaliseKey(req.method, req.originalUrl);
+    const isError = res.statusCode >= 500;
+
+    recordSample(key, durationMs, isError);
+
+    // Emit slow-request warnings (threshold: 500 ms)
+    if (durationMs > 500) {
+      logger.warn('Slow request detected', {
+        module: 'performanceMonitor',
+        route: key,
+        durationMs: durationMs.toFixed(2),
+        statusCode: res.statusCode,
+        requestId: req.requestId,
+      });
+    }
+  });
+
+  next();
+};
+
+/**
+ * Returns aggregated performance statistics for all observed routes.
+ * @returns {object[]} Array of route stat objects sorted by descending p95.
+ * @example
+ * // { route, count, errors, avg, min, max, p50, p95, p99 }
+ */
+export const getMetricsSummary = () => {
+  const result = [];
+  for (const [route, bucket] of metricsStore.entries()) {
+    const sorted = [...bucket.samples].sort((a, b) => a - b);
+    const avg = sorted.reduce((s, v) => s + v, 0) / (sorted.length || 1);
+    result.push({
+      route,
+      count:  bucket.count,
+      errors: bucket.errors,
+      avg:    +avg.toFixed(2),
+      min:    +sorted[0]?.toFixed(2) || 0,
+      max:    +sorted[sorted.length - 1]?.toFixed(2) || 0,
+      p50:    +percentile(sorted, 50).toFixed(2),
+      p95:    +percentile(sorted, 95).toFixed(2),
+      p99:    +percentile(sorted, 99).toFixed(2),
+    });
+  }
+  // Sort by p95 descending (worst routes first)
+  return result.sort((a, b) => b.p95 - a.p95);
+};
+
+/**
+ * Resets all collected metrics (useful for tests).
+ */
+export const resetMetrics = () => metricsStore.clear();
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.5</a>
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

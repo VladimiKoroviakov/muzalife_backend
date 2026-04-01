@@ -43,7 +43,10 @@
 
 
     <section>
-        <article><p><img src="https://img.shields.io/badge/License-MIT-green" alt="License"></p>
+        <article><p><img src="https://img.shields.io/badge/License-MIT-green" alt="License">
+<img src="https://img.shields.io/badge/Node.js-20.x-green" alt="Node.js">
+<img src="https://img.shields.io/badge/Express-4.x-lightgrey" alt="Express">
+<img src="https://img.shields.io/badge/PostgreSQL-15+-blue" alt="PostgreSQL"></p>
 <h1>MuzaLife Back End</h1>
 <p>Backend API for the MuzaLife application — a modern web ecosystem supporting the frontend with scalable REST endpoints.</p>
 <p>This repository contains the source code for the server-side of the MuzaLife project. It handles API routes, authentication, business logic, database interactions, and integrations used by the MuzaLife ecosystem.</p>
@@ -54,65 +57,361 @@
 <li>Environment-based configuration for easy deployment</li>
 <li>JWT Authentication &amp; OAuth (Google, Facebook)</li>
 <li>Database integration (PostgreSQL)</li>
+<li>HTTPS-only server (self-signed certs for local development)</li>
+<li>Swagger UI for interactive API documentation</li>
 <li>Structured logging and error handling</li>
 </ul>
 <h2>Getting Started</h2>
-<p>Follow these steps to run the backend locally.</p>
-<h3>Prerequisites</h3>
-<ul>
-<li>Node.js v16+</li>
-<li>npm or yarn</li>
-<li>Database setup (PostgreSQL)</li>
-</ul>
-<h3>Clone &amp; Install</h3>
-<pre class="prettyprint source"><code>git clone https://github.com/VladimiKoroviakov/muzalife_backend.git
+<p>Follow these steps to run the backend locally from a <strong>fresh OS installation</strong>.</p>
+<h3>1. Install Prerequisites</h3>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Version</th>
+<th>Download</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Node.js</td>
+<td>v20 LTS</td>
+<td>https://nodejs.org</td>
+</tr>
+<tr>
+<td>npm</td>
+<td>comes with Node.js</td>
+<td>—</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>v15+</td>
+<td>https://www.postgresql.org/download</td>
+</tr>
+<tr>
+<td>Git</td>
+<td>latest</td>
+<td>https://git-scm.com</td>
+</tr>
+<tr>
+<td>mkcert <em>(optional, for HTTPS)</em></td>
+<td>latest</td>
+<td>https://github.com/FiloSottile/mkcert</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Windows users:</strong> install Node.js via the official installer or <code>winget install OpenJS.NodeJS.LTS</code>. Install PostgreSQL via the official installer and add <code>psql</code> to your PATH.</p>
+</blockquote>
+<blockquote>
+<p><strong>macOS users:</strong> <code>brew install node postgresql@15 mkcert</code></p>
+</blockquote>
+<blockquote>
+<p><strong>Linux (Ubuntu/Debian):</strong> <code>sudo apt install nodejs npm postgresql</code></p>
+</blockquote>
+<hr>
+<h3>2. Clone the Repository</h3>
+<pre class="prettyprint source lang-bash"><code>git clone https://github.com/VladimiKoroviakov/muzalife_backend.git
 cd muzalife_backend
-npm install
 </code></pre>
-<h2>Project Structure</h2>
-<pre class="prettyprint source"><code>/
-├── config/        # App configuration (DB setup + Multer if you want to serve files)
-├── controllers/   # Request handlers for routes
-├── middlewares/   # Express middlewares (auth, validation, logging, file uploads)
-├── routes/        # API route definitions
-├── scripts/       # Scripts for the intial databse setup (Adding all the tables & indexes)
-├── services/      # Business logic and external integrations (email, verification)
-├── utils/         # Utility functions (formatters, validators, JWT)
-├── server.js      # Server entry point (main file)
+<hr>
+<h3>3. Install Dependencies</h3>
+<pre class="prettyprint source lang-bash"><code>npm install
 </code></pre>
-<h2>Configuration</h2>
-<p>Environment Variables</p>
-<p>Create a <code>.env</code> file in the project root:</p>
-<pre class="prettyprint source"><code>PORT=your_localhost_port_here
-DB_HOST=localhost
-DB_PORT=your_db_port_here
-DB_NAME=muzalife
-DB_USER=your_db_user_here
-DB_PASSWORD=your_db_password_here
-JWT_SECRET=your_jwt_secret_here
-FRONTEND_URL=your_front_end_url_here
-BACKEND_URL=your_back_end_url_here
+<hr>
+<h3>4. Configure Environment Variables</h3>
+<p>Copy the example below and create a <code>.env</code> file in the project root:</p>
+<pre class="prettyprint source lang-bash"><code># Server
+PORT=5001
 
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=muzalife
+DB_USER=postgres
+DB_PASSWORD=your_db_password_here
+
+# Security
+JWT_SECRET=your_long_random_secret_here
+
+# URLs (must match your local setup)
+FRONTEND_URL=https://localhost:3000
+BACKEND_URL=https://localhost:5001
+
+# Payment (use sandbox keys for development)
+LIQPAY_PUBLIC_KEY=sandbox_your_public_key
+LIQPAY_PRIVATE_KEY=sandbox_your_private_key
+
+# SMTP (Gmail example — use App Password if 2FA is enabled)
 SMTP_HOST=smtp.gmail.com
-SMTP_PORT=your_mail_service_port_here
+SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=your_mail_service_user_email_here
-SMTP_PASSWORD=your_mail_service_app_pawssword_here
+SMTP_USER=your_email@gmail.com
+SMTP_PASSWORD=your_app_password_here
 EMAIL_FROM=&quot;Muza Life&quot; &lt;noreply@muzalife.com>
 
+# OAuth
 FACEBOOK_APP_ID=your_facebook_app_id_here
-FACEBOOK_APP_SECRET=your__facebook_app_secret_here
+FACEBOOK_APP_SECRET=your_facebook_app_secret_here
 </code></pre>
-<h2>Running the code</h2>
-<p>Run <code>npm i</code> to install the dependencies (if you haven't done that already).</p>
-<p>Run <code>npm run dev</code> to start the development server.</p>
-<p>Run</p>
-<pre class="prettyprint source"><code>npm run build
-npm start
+<blockquote>
+<p><strong>Note:</strong> Never commit <code>.env</code> to version control. It is already listed in <code>.gitignore</code>.</p>
+</blockquote>
+<hr>
+<h3>5. Set Up HTTPS Certificates</h3>
+<p>The backend <strong>requires</strong> HTTPS even locally. Generate self-signed certificates for <code>localhost</code>:</p>
+<p><strong>Option A — using mkcert (recommended):</strong></p>
+<pre class="prettyprint source lang-bash"><code># Install mkcert's local CA
+mkcert -install
+
+# Generate certs for localhost and place them in the certs/ directory
+mkcert -cert-file certs/localhost-cert.pem -key-file certs/localhost-key.pem localhost 127.0.0.1
 </code></pre>
-<p>to start in production mode</p>
+<p><strong>Option B — using OpenSSL:</strong></p>
+<pre class="prettyprint source lang-bash"><code>mkdir -p certs
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout certs/localhost-key.pem \
+  -out certs/localhost-cert.pem \
+  -subj &quot;/CN=localhost&quot;
+</code></pre>
+<blockquote>
+<p>The server checks for <code>certs/localhost-key.pem</code> and <code>certs/localhost-cert.pem</code> at startup and exits if they are missing.</p>
+</blockquote>
+<hr>
+<h3>6. Set Up the Database</h3>
+<p><strong>Step 6.1 — Start PostgreSQL</strong></p>
+<ul>
+<li><strong>Windows:</strong> PostgreSQL service usually starts automatically. Check via <em>Services</em> or run <code>pg_ctl start</code>.</li>
+<li><strong>macOS:</strong> <code>brew services start postgresql@15</code></li>
+<li><strong>Linux:</strong> <code>sudo systemctl start postgresql</code></li>
+</ul>
+<p><strong>Step 6.2 — Create the database</strong></p>
+<p>Connect to PostgreSQL as the superuser and create a database:</p>
+<pre class="prettyprint source lang-bash"><code>psql -U postgres -c &quot;CREATE DATABASE muzalife;&quot;
+</code></pre>
+<p><strong>Step 6.3 — Run the schema setup script</strong></p>
+<p>This creates all tables, indexes, and relationships defined in <code>scripts/setupDatabase.js</code>:</p>
+<pre class="prettyprint source lang-bash"><code>npm run setup-db
+</code></pre>
+<p>Expected output:</p>
+<pre class="prettyprint source"><code>Connected to PostgreSQL
+Database 'muzalife' ensured
+Complete database schema created successfully
+Uploads directory created: .../uploads/products
+</code></pre>
+<hr>
+<h3>7. Run in Development Mode</h3>
+<pre class="prettyprint source lang-bash"><code>npm run dev
+</code></pre>
+<p>The server starts at <strong>https://localhost:5001</strong> using <code>nodemon</code> (auto-restarts on file changes).</p>
+<p>Expected output:</p>
+<pre class="prettyprint source"><code>🚀 Muza Life Backend Server running on port 5001
+📖 Swagger UI available at: https://localhost:5001/api/docs
+📍 Health check: https://localhost:5001/api/health
+</code></pre>
+<blockquote>
+<p>Your browser may warn about the self-signed certificate. Accept the exception to proceed.</p>
+</blockquote>
+<hr>
+<h3>8. Verify the Installation</h3>
+<p>Open the following endpoints to confirm everything works:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Expected response</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET https://localhost:5001/api/health</code></td>
+<td><code>{&quot;status&quot;:&quot;OK&quot;}</code></td>
+</tr>
+<tr>
+<td><code>GET https://localhost:5001/api/test-db</code></td>
+<td><code>{&quot;status&quot;:&quot;Database connected successfully&quot;,...}</code></td>
+</tr>
+<tr>
+<td><code>GET https://localhost:5001/api/docs</code></td>
+<td>Swagger UI</td>
+</tr>
+</tbody>
+</table>
+<h2>Project Structure</h2>
+<pre class="prettyprint source"><code>/
+├── certs/         # HTTPS certificates (not committed to git)
+├── config/        # App configuration (DB connection, Multer)
+├── controllers/   # Request handlers for each route group
+├── docs/          # Project documentation (API spec, deployment guides)
+│   ├── api/       # OpenAPI 3.0 spec (openapi.yaml)
+│   ├── jsdoc/     # Auto-generated JSDoc HTML reference
+│   ├── deployment.md
+│   ├── update.md
+│   └── backup.md
+├── middleware/    # Express middlewares (auth, file uploads)
+├── routes/        # API route definitions
+├── scripts/       # Utility scripts (DB setup)
+├── services/      # Business logic & integrations (email, verification)
+├── uploads/       # User-uploaded files (not committed to git)
+├── utils/         # Utility functions (JWT, URL helpers)
+└── server.js      # Application entry point
+</code></pre>
+<h2>NPM Scripts Reference</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>npm run dev</code></td>
+<td>Start development server with hot-reload (nodemon)</td>
+</tr>
+<tr>
+<td><code>npm start</code></td>
+<td>Start production server</td>
+</tr>
+<tr>
+<td><code>npm run setup-db</code></td>
+<td>Create all database tables and indexes</td>
+</tr>
+<tr>
+<td><code>npm test</code></td>
+<td>Run all unit tests (Vitest)</td>
+</tr>
+<tr>
+<td><code>npm run test:coverage</code></td>
+<td>Run tests with coverage report</td>
+</tr>
+<tr>
+<td><code>npm run lint</code></td>
+<td>Run ESLint</td>
+</tr>
+<tr>
+<td><code>npm run lint:fix</code></td>
+<td>Run ESLint and auto-fix</td>
+</tr>
+<tr>
+<td><code>npm run docs</code></td>
+<td>Generate JSDoc HTML → <code>docs/jsdoc/</code></td>
+</tr>
+<tr>
+<td><code>npm run docs:clean</code></td>
+<td>Clean and regenerate JSDoc</td>
+</tr>
+<tr>
+<td><code>npm run check</code></td>
+<td>Run lint + doc tests (used by CI)</td>
+</tr>
+</tbody>
+</table>
+<h2>Configuration</h2>
+<h3>Environment Variables Reference</h3>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PORT</code></td>
+<td>No</td>
+<td>Server port (default: 5001)</td>
+</tr>
+<tr>
+<td><code>DB_HOST</code></td>
+<td>Yes</td>
+<td>PostgreSQL host</td>
+</tr>
+<tr>
+<td><code>DB_PORT</code></td>
+<td>Yes</td>
+<td>PostgreSQL port (default: 5432)</td>
+</tr>
+<tr>
+<td><code>DB_NAME</code></td>
+<td>Yes</td>
+<td>Database name</td>
+</tr>
+<tr>
+<td><code>DB_USER</code></td>
+<td>Yes</td>
+<td>Database user</td>
+</tr>
+<tr>
+<td><code>DB_PASSWORD</code></td>
+<td>Yes</td>
+<td>Database password</td>
+</tr>
+<tr>
+<td><code>JWT_SECRET</code></td>
+<td>Yes</td>
+<td>Secret for signing JWT tokens (min 32 chars)</td>
+</tr>
+<tr>
+<td><code>FRONTEND_URL</code></td>
+<td>Yes</td>
+<td>Frontend origin (for CORS)</td>
+</tr>
+<tr>
+<td><code>BACKEND_URL</code></td>
+<td>Yes</td>
+<td>Backend base URL</td>
+</tr>
+<tr>
+<td><code>SMTP_HOST</code></td>
+<td>Yes</td>
+<td>SMTP server hostname</td>
+</tr>
+<tr>
+<td><code>SMTP_PORT</code></td>
+<td>Yes</td>
+<td>SMTP port</td>
+</tr>
+<tr>
+<td><code>SMTP_USER</code></td>
+<td>Yes</td>
+<td>SMTP username/email</td>
+</tr>
+<tr>
+<td><code>SMTP_PASSWORD</code></td>
+<td>Yes</td>
+<td>SMTP password or App Password</td>
+</tr>
+<tr>
+<td><code>EMAIL_FROM</code></td>
+<td>Yes</td>
+<td>Sender name and address</td>
+</tr>
+<tr>
+<td><code>FACEBOOK_APP_ID</code></td>
+<td>No</td>
+<td>Facebook OAuth App ID</td>
+</tr>
+<tr>
+<td><code>FACEBOOK_APP_SECRET</code></td>
+<td>No</td>
+<td>Facebook OAuth App Secret</td>
+</tr>
+<tr>
+<td><code>LIQPAY_PUBLIC_KEY</code></td>
+<td>No</td>
+<td>LiqPay payment public key</td>
+</tr>
+<tr>
+<td><code>LIQPAY_PRIVATE_KEY</code></td>
+<td>No</td>
+<td>LiqPay payment private key</td>
+</tr>
+</tbody>
+</table>
 <h2>Documentation</h2>
-<h3>Documentation standard</h3>
+<h3>Documentation Standard</h3>
 <p>All public modules, controllers, services, middleware, and utility functions use <strong>JSDoc 3</strong> comments. Every contributor must follow the same standard to keep the generated reference up-to-date.</p>
 <p><strong>Minimum required tags for every exported symbol:</strong></p>
 <table>
@@ -145,40 +444,33 @@ npm start
 </tr>
 </tbody>
 </table>
-<p><strong>Document in the description body (not just tags):</strong></p>
-<ul>
-<li>Why the function/class exists (architectural or business reason)</li>
-<li>Non-obvious algorithms (e.g. the two-step registration flow)</li>
-<li>Edge cases and their handling</li>
-</ul>
-<h3>Generating HTML docs</h3>
-<pre class="prettyprint source lang-bash"><code># Install dependencies (only needed once)
-npm install
-
-# Generate JSDoc HTML → docs/jsdoc/
-npm run docs
-
-# Clean output and regenerate
-npm run docs:clean
+<h3>Generating HTML Docs</h3>
+<pre class="prettyprint source lang-bash"><code>npm run docs        # Generate to docs/jsdoc/
+npm run docs:clean  # Clean and regenerate
 </code></pre>
 <p>Open <code>docs/jsdoc/index.html</code> in a browser to browse the reference.</p>
-<h3>API documentation (Swagger UI)</h3>
+<h3>API Documentation (Swagger UI)</h3>
 <p>The full OpenAPI 3.0 specification lives in <code>docs/api/openapi.yaml</code>.</p>
 <p>When the server is running, browse the <strong>interactive Swagger UI</strong> at:</p>
 <pre class="prettyprint source"><code>https://localhost:5001/api/docs
 </code></pre>
-<h3>Linting docs quality</h3>
+<h3>Linting Docs Quality</h3>
 <pre class="prettyprint source lang-bash"><code>npm run lint
 </code></pre>
-<p>JSDoc-related warnings (<code>jsdoc/require-jsdoc</code>, <code>jsdoc/require-param</code>, etc.) indicate missing documentation. Fix all warnings before opening a Pull Request.</p>
-<h3>Detailed guide</h3>
+<p>JSDoc-related warnings indicate missing documentation. Fix all warnings before opening a Pull Request.</p>
+<h3>Detailed Guide</h3>
 <p>See <a href="./docs/generate_docs.md"><code>docs/generate_docs.md</code></a> for the full documentation guide.</p>
+<hr>
+<h2>Deployment</h2>
+<p>See <a href="./docs/deployment.md"><code>docs/deployment.md</code></a> for the production deployment guide.</p>
+<p>See <a href="./docs/update.md"><code>docs/update.md</code></a> for the update and rollback procedures.</p>
+<p>See <a href="./docs/backup.md"><code>docs/backup.md</code></a> for the backup and restore procedures.</p>
 <hr>
 <h2>Contributing</h2>
 <p>Contributions are welcome! Follow these steps:</p>
 <ol>
 <li>Fork it</li>
-<li>Create your feature branch (git checkout -b feature/your-feature)</li>
+<li>Create your feature branch (<code>git checkout -b feature/your-feature</code>)</li>
 <li>Commit your changes</li>
 <li>Push to your branch</li>
 <li>Open a Pull Request</li>
@@ -204,7 +496,7 @@ npm run docs:clean
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
 </nav>
 
 <br class="clear">

@@ -114,7 +114,7 @@ router.post('/', async (req, res) => {
         order_status,
         order_price,
         order_material_type,
-        order_material_age_category,
+        order_material_age_category_id,
         order_deadline
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
@@ -267,7 +267,7 @@ router.put('/:orderId', async (req, res) => {
       values.push(orderMaterialType);
     }
     if (orderMaterialAgeCategory !== undefined) {
-      updates.push(`order_material_age_category = $${paramIndex++}`);
+      updates.push(`order_material_age_category_id = $${paramIndex++}`);
       values.push(orderMaterialAgeCategory);
     }
     if (orderDeadline !== undefined) {

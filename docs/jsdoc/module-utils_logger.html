@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Global</title>
+    <title>JSDoc: Module: utils/logger</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Global</h1>
+    <h1 class="page-title">Module: utils/logger</h1>
 
     
 
@@ -28,7 +28,8 @@
 
 <header>
     
-        <h2></h2>
+        
+            
         
     
 </header>
@@ -37,8 +38,37 @@
     <div class="container-overview">
     
         
+            <div class="description"><p>Centralized Winston-based logging utility for MuzaLife backend.</p>
+<p>Provides a configured logger with multiple transports:</p>
+<ul>
+<li>Console output (colorized, human-readable)</li>
+<li>Combined log file (all levels)</li>
+<li>Error-only log file</li>
+<li>Daily rotating log files (by date, max 14 days retention)</li>
+</ul>
+<p><strong>Log level</strong> is controlled at runtime via the <code>LOG_LEVEL</code> environment
+variable — no recompilation required.  Falls back to <code>'info'</code> in
+production and <code>'debug'</code> in development if the variable is not set.</p>
+<p><strong>Log format</strong> (JSON lines in files, colorized text in console):</p>
+<pre class="prettyprint source"><code>{&quot;timestamp&quot;:&quot;…&quot;,&quot;level&quot;:&quot;info&quot;,&quot;module&quot;:&quot;server&quot;,&quot;message&quot;:&quot;…&quot;,&quot;requestId&quot;:&quot;…&quot;}
+</code></pre></div>
+        
 
         
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 <dl class="details">
@@ -68,6 +98,11 @@
     
 
     
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
 
     
 
@@ -75,6 +110,24 @@
 
     
 </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
         
@@ -98,13 +151,14 @@
 
         
             
-<h4 class="name" id="changePassword"><span class="type-signature">(constant) </span>changePassword<span class="type-signature"></span></h4>
+<h4 class="name" id="~combinedFileTransport"><span class="type-signature">(inner, constant) </span>combinedFileTransport<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Change password</p>
+    <p>Combined file — all messages at or above LOG_LEVEL.
+Not rotated; suitable for short-lived containers or manual archiving.</p>
 </div>
 
 
@@ -142,7 +196,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line293">line 293</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line91">line 91</a>
     </li></ul></dd>
     
 
@@ -160,13 +214,13 @@
 
         
             
-<h4 class="name" id="deleteAccount"><span class="type-signature">(constant) </span>deleteAccount<span class="type-signature"></span></h4>
+<h4 class="name" id="~consoleFormat"><span class="type-signature">(inner, constant) </span>consoleFormat<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Delete user account</p>
+    <p>Human-readable colorized format for the console.</p>
 </div>
 
 
@@ -204,7 +258,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line407">line 407</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line64">line 64</a>
     </li></ul></dd>
     
 
@@ -222,13 +276,14 @@
 
         
             
-<h4 class="name" id="getProfile"><span class="type-signature">(constant) </span>getProfile<span class="type-signature"></span></h4>
+<h4 class="name" id="~consoleTransport"><span class="type-signature">(inner, constant) </span>consoleTransport<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Get user profile</p>
+    <p>Console transport — always active.
+In production the level is capped at 'info' unless LOG_LEVEL overrides it.</p>
 </div>
 
 
@@ -266,7 +321,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line16">line 16</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line82">line 82</a>
     </li></ul></dd>
     
 
@@ -284,13 +339,24 @@
 
         
             
-<h4 class="name" id="initiateEmailChange"><span class="type-signature">(constant) </span>initiateEmailChange<span class="type-signature"></span></h4>
+<h4 class="name" id="~dailyRotateTransport"><span class="type-signature">(inner, constant) </span>dailyRotateTransport<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Initiate email change</p>
+    <p>Daily rotating transport — one file per day, retained for 14 days.
+Filenames: logs/muzalife-YYYY-MM-DD.log
+Compression: gzip on rotation.</p>
+<p>Log rotation strategy:</p>
+<ul>
+<li>By time: new file every day at midnight UTC</li>
+<li>By size: if a single day's file exceeds 20 MB it is rotated mid-day</li>
+<li>Retention: files older than 14 days are deleted automatically</li>
+</ul>
+<p>In containerised deployments (Docker) log rotation is typically handled by
+the container runtime (e.g. Docker's <code>--log-opt max-size</code>).  This in-process
+rotation provides an additional safety net for bare-metal or VM deployments.</p>
 </div>
 
 
@@ -328,7 +394,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line88">line 88</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line127">line 127</a>
     </li></ul></dd>
     
 
@@ -346,13 +412,14 @@
 
         
             
-<h4 class="name" id="removeProfileImage"><span class="type-signature">(constant) </span>removeProfileImage<span class="type-signature"></span></h4>
+<h4 class="name" id="~errorFileTransport"><span class="type-signature">(inner, constant) </span>errorFileTransport<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Remove profile image</p>
+    <p>Error-only file — only 'error' level messages.
+Allows quick inspection of failures without grepping.</p>
 </div>
 
 
@@ -390,7 +457,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line372">line 372</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line104">line 104</a>
     </li></ul></dd>
     
 
@@ -408,13 +475,13 @@
 
         
             
-<h4 class="name" id="resendEmailChangeCode"><span class="type-signature">(constant) </span>resendEmailChangeCode<span class="type-signature"></span></h4>
+<h4 class="name" id="~fileFormat"><span class="type-signature">(inner, constant) </span>fileFormat<span class="type-signature"></span></h4>
 
 
 
 
 <div class="description">
-    <p>Resend email change code</p>
+    <p>JSON format used for log files — machine-parseable.</p>
 </div>
 
 
@@ -452,255 +519,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line241">line 241</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="resendMaterial"><span class="type-signature">(constant) </span>resendMaterial<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Resend material</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line424">line 424</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="updateName"><span class="type-signature">(constant) </span>updateName<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Update user name</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line53">line 53</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="uploadProfileImage"><span class="type-signature">(constant) </span>uploadProfileImage<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Upload profile image</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line345">line 345</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="verifyEmailChange"><span class="type-signature">(constant) </span>verifyEmailChange<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Verify email change</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="controllers_usersController.js.html">controllers/usersController.js</a>, <a href="controllers_usersController.js.html#line168">line 168</a>
+        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line56">line 56</a>
     </li></ul></dd>
     
 

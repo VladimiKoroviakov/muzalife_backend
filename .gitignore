@@ -27,3 +27,7 @@ logs/
 
 # Certificate files
 certs/
+
+# Generated files
+CLAUDE.md
+.claude/
