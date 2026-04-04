@@ -1,22 +1,32 @@
 /**
  * @file Polls REST API routes for MuzaLife.
  *
- * Handles poll CRUD, user voting, and result aggregation.
+ * Handles poll creation, user voting, status management, and result aggregation.
  *
- * **Key fixes applied vs the original draft:**
- * - All admin routes now read `req.userId` (set by `authenticateToken`) instead
- *   of the non-existent `req.user.user_id`.
- * - Added `GET /api/polls/results` — returns vote counts for **all** polls.
+ * **Auth summary:**
+ * - `GET /`                  — authenticated users (active polls + per-user vote state)
+ * - `GET /results`           — admin only (all polls, all vote counts)
+ * - `GET /:pollId`           — authenticated users
+ * - `POST /`                 — admin only (create poll)
+ * - `POST /:pollId/vote`     — authenticated users
+ * - `GET /:pollId/results`   — public (single-poll result)
+ * - `PUT /:pollId/status`    — admin only (activate / deactivate)
  * @module routes/polls
  */
 
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
 // ── Helper: check if the authenticated user is admin ─────────────────────────
+/**
+ * Returns true if the given user has admin privileges.
+ * @param {number} userId - Authenticated user ID from the JWT.
+ * @returns {Promise<boolean>} True if the user is an admin, false otherwise.
+ */
 const isAdmin = async (userId) => {
   const result = await query(
     'SELECT is_admin FROM Users WHERE user_id = $1',
@@ -29,11 +39,16 @@ const isAdmin = async (userId) => {
 /**
  * Returns all active polls, including per-option vote counts and whether the
  * current user has already voted.
+ *
+ * **Auth:** authenticated user
+ *
+ * **Response:**
+ * ```json
+ * { "success": true, "polls": [ { poll_id, poll_question, is_active, total_votes, user_has_voted, options: [...] } ] }
+ * ```
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const userId = req.userId;
-
     const result = await query(`
       SELECT
         p.poll_id,
@@ -66,15 +81,18 @@ router.get('/', authenticateToken, async (req, res) => {
       WHERE p.is_active = true
       GROUP BY p.poll_id, p.poll_question, p.is_active, p.poll_created_at
       ORDER BY p.poll_created_at DESC
-    `, [userId]);
+    `, [req.userId]);
 
     res.json({ success: true, polls: result.rows });
   } catch (error) {
-    console.error('Error fetching polls:', error);
+    logger.error('Error fetching polls', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch polls',
-      details: error.message,
+      error: { uk: 'Не вдалося отримати опитування', en: 'Failed to fetch polls' },
     });
   }
 });
@@ -84,7 +102,9 @@ router.get('/', authenticateToken, async (req, res) => {
  * Returns vote results for **all** polls (active and closed).
  * Intended for the admin dashboard.
  *
- * Response shape:
+ * **Auth:** admin
+ *
+ * **Response:**
  * ```json
  * {
  *   "success": true,
@@ -95,18 +115,22 @@ router.get('/', authenticateToken, async (req, res) => {
  *       "is_active": false,
  *       "total_votes": 42,
  *       "options": [
- *         { "vote_id": 1, "vote_text": "Option A", "vote_count": 28, "percentage": "66.7" },
- *         ...
+ *         { "vote_id": 1, "vote_text": "Option A", "vote_count": 28, "percentage": "66.7" }
  *       ]
- *     },
- *     ...
+ *     }
  *   ]
  * }
  * ```
  */
-router.get('/results', async (req, res) => {
+router.get('/results', authenticateToken, async (req, res) => {
   try {
-    // Fetch all polls
+    if (!(await isAdmin(req.userId))) {
+      return res.status(403).json({
+        success: false,
+        error: { uk: 'Доступ лише для адміністраторів', en: 'Access denied. Admins only.' },
+      });
+    }
+
     const pollsResult = await query(`
       SELECT poll_id, poll_question, is_active, poll_created_at
       FROM Polls
@@ -115,7 +139,6 @@ router.get('/results', async (req, res) => {
 
     const polls = await Promise.all(
       pollsResult.rows.map(async (poll) => {
-        // Vote counts per option for this poll
         const optionsResult = await query(`
           SELECT
             pv.vote_id,
@@ -146,11 +169,11 @@ router.get('/results', async (req, res) => {
         });
 
         return {
-          poll_id:       poll.poll_id,
-          poll_question: poll.poll_question,
-          is_active:     poll.is_active,
+          poll_id:         poll.poll_id,
+          poll_question:   poll.poll_question,
+          is_active:       poll.is_active,
           poll_created_at: poll.poll_created_at,
-          total_votes:   totalVotes,
+          total_votes:     totalVotes,
           options,
         };
       }),
@@ -158,11 +181,14 @@ router.get('/results', async (req, res) => {
 
     res.json({ success: true, polls });
   } catch (error) {
-    console.error('Error fetching all poll results:', error);
+    logger.error('Error fetching all poll results', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch poll results',
-      details: error.message,
+      error: { uk: 'Не вдалося отримати результати опитувань', en: 'Failed to fetch poll results' },
     });
   }
 });
@@ -171,12 +197,18 @@ router.get('/results', async (req, res) => {
 /**
  * Returns a single poll with its options, total votes, and the current user's
  * vote (if any).
+ *
+ * **Auth:** authenticated user
+ *
+ * **Response:**
+ * ```json
+ * { "success": true, "poll": { ...poll, options: [...], user_vote, user_has_voted } }
+ * ```
  */
 router.get('/:pollId', authenticateToken, async (req, res) => {
-  try {
-    const { pollId } = req.params;
-    const userId = req.userId;
+  const { pollId } = req.params;
 
+  try {
     const pollResult = await query(`
       SELECT
         p.*,
@@ -189,7 +221,10 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
     `, [pollId]);
 
     if (pollResult.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Poll not found' });
+      return res.status(404).json({
+        success: false,
+        error: { uk: 'Опитування не знайдено', en: 'Poll not found' },
+      });
     }
 
     const optionsResult = await query(`
@@ -207,34 +242,37 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
     let userVote      = null;
     let user_has_voted = false;
 
-    if (userId) {
-      const userVoteResult = await query(`
-        SELECT puv.vote_id, pv.vote_text
-        FROM PollUserVotes puv
-        JOIN PollVotes pv ON puv.vote_id = pv.vote_id
-        WHERE pv.poll_id = $1 AND puv.user_id = $2
-      `, [pollId, userId]);
+    const userVoteResult = await query(`
+      SELECT puv.vote_id, pv.vote_text
+      FROM PollUserVotes puv
+      JOIN PollVotes pv ON puv.vote_id = pv.vote_id
+      WHERE pv.poll_id = $1 AND puv.user_id = $2
+    `, [pollId, req.userId]);
 
-      if (userVoteResult.rows.length > 0) {
-        user_has_voted = true;
-        userVote = userVoteResult.rows[0].vote_id;
-      }
+    if (userVoteResult.rows.length > 0) {
+      user_has_voted = true;
+      userVote = userVoteResult.rows[0].vote_id;
     }
 
-    const poll = {
-      ...pollResult.rows[0],
-      options: optionsResult.rows,
-      user_vote: userVote,
-      user_has_voted,
-    };
-
-    res.json({ success: true, poll });
+    res.json({
+      success: true,
+      poll: {
+        ...pollResult.rows[0],
+        options: optionsResult.rows,
+        user_vote: userVote,
+        user_has_voted,
+      },
+    });
   } catch (error) {
-    console.error('Error fetching poll:', error);
+    logger.error('Error fetching poll', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch poll',
-      details: error.message,
+      error: { uk: 'Не вдалося отримати опитування', en: 'Failed to fetch poll' },
     });
   }
 });
@@ -243,17 +281,20 @@ router.get('/:pollId', authenticateToken, async (req, res) => {
 /**
  * Creates a new poll with its vote options (admin only).
  *
- * Body: `{ poll_question: string, options: string[] }`  (minimum 2 options)
+ * **Auth:** admin
+ *
+ * **Body:**
+ * - `poll_question` {string}   Required
+ * - `options`       {string[]} Required — minimum 2 items
+ *
+ * **Response:** `201` with the created poll row.
  */
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    // req.userId is set by authenticateToken
-    const userId = req.userId;
-
-    if (!(await isAdmin(userId))) {
+    if (!(await isAdmin(req.userId))) {
       return res.status(403).json({
         success: false,
-        error: 'Only administrators can create polls',
+        error: { uk: 'Лише адміністратори можуть створювати опитування', en: 'Only administrators can create polls' },
       });
     }
 
@@ -262,11 +303,13 @@ router.post('/', authenticateToken, async (req, res) => {
     if (!poll_question || !Array.isArray(options) || options.length < 2) {
       return res.status(400).json({
         success: false,
-        error: 'poll_question is required and options must be an array with at least 2 items',
+        error: {
+          uk: 'poll_question є обов\'язковим, а options має містити мінімум 2 варіанти',
+          en: 'poll_question is required and options must be an array with at least 2 items',
+        },
       });
     }
 
-    // Create the poll
     const pollResult = await query(`
       INSERT INTO Polls (poll_question, is_active)
       VALUES ($1, true)
@@ -275,7 +318,6 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const pollId = pollResult.rows[0].poll_id;
 
-    // Insert vote options
     await Promise.all(
       options.map((optionText) =>
         query(
@@ -285,13 +327,23 @@ router.post('/', authenticateToken, async (req, res) => {
       ),
     );
 
+    logger.info('Poll created', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      userId: req.userId,
+    });
+
     res.status(201).json({ success: true, poll: pollResult.rows[0] });
   } catch (error) {
-    console.error('Error creating poll:', error);
+    logger.error('Error creating poll', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to create poll',
-      details: error.message,
+      error: { uk: 'Не вдалося створити опитування', en: 'Failed to create poll' },
     });
   }
 });
@@ -299,67 +351,91 @@ router.post('/', authenticateToken, async (req, res) => {
 // ── POST /api/polls/:pollId/vote ──────────────────────────────────────────────
 /**
  * Records a vote for the authenticated user.
- * Each user can vote only once per poll.
+ * Each user may vote only once per poll.
+ *
+ * **Auth:** authenticated user
+ *
+ * **Body:** `{ vote_id: number }`
+ *
+ * **Response:** `{ "success": true, "message": { uk, en } }`
  */
 router.post('/:pollId/vote', authenticateToken, async (req, res) => {
+  const { pollId } = req.params;
+  const { vote_id } = req.body;
+
+  if (!vote_id) {
+    return res.status(400).json({
+      success: false,
+      error: { uk: 'vote_id є обов\'язковим', en: 'vote_id is required' },
+    });
+  }
+
   try {
-    const { pollId } = req.params;
-    const { vote_id } = req.body;
-    const userId = req.userId;
-
-    if (!vote_id) {
-      return res.status(400).json({ success: false, error: 'vote_id is required' });
-    }
-
-    // Poll must exist and be active
     const pollCheck = await query(
       'SELECT * FROM Polls WHERE poll_id = $1 AND is_active = true',
       [pollId],
     );
 
     if (pollCheck.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Poll not found or not active' });
+      return res.status(404).json({
+        success: false,
+        error: { uk: 'Опитування не знайдено або воно закрите', en: 'Poll not found or not active' },
+      });
     }
 
-    // Vote option must belong to this poll
     const voteCheck = await query(
       'SELECT * FROM PollVotes WHERE vote_id = $1 AND poll_id = $2',
       [vote_id, pollId],
     );
 
     if (voteCheck.rows.length === 0) {
-      return res.status(400).json({ success: false, error: 'Invalid vote option for this poll' });
+      return res.status(400).json({
+        success: false,
+        error: { uk: 'Невірний варіант відповіді для цього опитування', en: 'Invalid vote option for this poll' },
+      });
     }
 
-    // Prevent duplicate votes
     const existingVote = await query(`
       SELECT puv.*
       FROM PollUserVotes puv
       JOIN PollVotes pv ON puv.vote_id = pv.vote_id
       WHERE pv.poll_id = $1 AND puv.user_id = $2
-    `, [pollId, userId]);
+    `, [pollId, req.userId]);
 
     if (existingVote.rows.length > 0) {
-      return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
+      return res.status(400).json({
+        success: false,
+        error: { uk: 'Ви вже проголосували в цьому опитуванні', en: 'You have already voted on this poll' },
+      });
     }
 
     await query(
       'INSERT INTO PollUserVotes (vote_id, user_id) VALUES ($1, $2)',
-      [vote_id, userId],
+      [vote_id, req.userId],
     );
 
-    res.json({ success: true, message: 'Vote recorded successfully' });
+    res.json({
+      success: true,
+      message: { uk: 'Голос успішно зараховано', en: 'Vote recorded successfully' },
+    });
   } catch (error) {
-    console.error('Error recording vote:', error);
-
     if (error.code === '23505') {
-      return res.status(400).json({ success: false, error: 'You have already voted on this poll' });
+      return res.status(400).json({
+        success: false,
+        error: { uk: 'Ви вже проголосували в цьому опитуванні', en: 'You have already voted on this poll' },
+      });
     }
 
+    logger.error('Error recording vote', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      userId: req.userId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to record vote',
-      details: error.message,
+      error: { uk: 'Не вдалося зарахувати голос', en: 'Failed to record vote' },
     });
   }
 });
@@ -367,15 +443,32 @@ router.post('/:pollId/vote', authenticateToken, async (req, res) => {
 // ── GET /api/polls/:pollId/results ────────────────────────────────────────────
 /**
  * Returns vote results for a single poll (public — no auth required).
+ *
+ * **Auth:** none
+ *
+ * **Response:**
+ * ```json
+ * {
+ *   "success": true,
+ *   "poll_id": 1,
+ *   "poll_question": "...",
+ *   "results": [ { "vote_id": 1, "vote_text": "...", "vote_count": 28, "percentage": "66.7" } ],
+ *   "total_votes": 42,
+ *   "poll_active": true
+ * }
+ * ```
  */
 router.get('/:pollId/results', async (req, res) => {
-  try {
-    const { pollId } = req.params;
+  const { pollId } = req.params;
 
+  try {
     const pollCheck = await query('SELECT * FROM Polls WHERE poll_id = $1', [pollId]);
 
     if (pollCheck.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Poll not found' });
+      return res.status(404).json({
+        success: false,
+        error: { uk: 'Опитування не знайдено', en: 'Poll not found' },
+      });
     }
 
     const result = await query(`
@@ -413,11 +506,15 @@ router.get('/:pollId/results', async (req, res) => {
       poll_active:   pollCheck.rows[0].is_active,
     });
   } catch (error) {
-    console.error('Error fetching poll results:', error);
+    logger.error('Error fetching poll results', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch poll results',
-      details: error.message,
+      error: { uk: 'Не вдалося отримати результати опитування', en: 'Failed to fetch poll results' },
     });
   }
 });
@@ -426,49 +523,69 @@ router.get('/:pollId/results', async (req, res) => {
 /**
  * Activates or deactivates a poll (admin only).
  *
- * Body: `{ is_active: boolean }`
+ * **Auth:** admin
+ *
+ * **Body:** `{ is_active: boolean }`
+ *
+ * **Response:** updated poll row.
  */
 router.put('/:pollId/status', authenticateToken, async (req, res) => {
+  const { pollId } = req.params;
+  const { is_active } = req.body;
+
   try {
-    const { pollId } = req.params;
-    const { is_active } = req.body;
-
-    // req.userId is correctly set by authenticateToken
-    const userId = req.userId;
-
-    if (!(await isAdmin(userId))) {
+    if (!(await isAdmin(req.userId))) {
       return res.status(403).json({
         success: false,
-        error: 'Only administrators can update poll status',
+        error: { uk: 'Лише адміністратори можуть змінювати статус опитування', en: 'Only administrators can update poll status' },
       });
     }
 
     if (typeof is_active !== 'boolean') {
       return res.status(400).json({
         success: false,
-        error: 'is_active must be a boolean',
+        error: { uk: 'is_active має бути булевим значенням', en: 'is_active must be a boolean' },
       });
     }
 
-    const result = await query(`
-      UPDATE Polls SET is_active = $1 WHERE poll_id = $2 RETURNING *
-    `, [is_active, pollId]);
+    const result = await query(
+      'UPDATE Polls SET is_active = $1 WHERE poll_id = $2 RETURNING *',
+      [is_active, pollId],
+    );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'Poll not found' });
+      return res.status(404).json({
+        success: false,
+        error: { uk: 'Опитування не знайдено', en: 'Poll not found' },
+      });
     }
+
+    logger.info('Poll status updated', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      is_active,
+      userId: req.userId,
+    });
 
     res.json({
       success: true,
-      message: `Poll ${is_active ? 'activated' : 'deactivated'} successfully`,
-      poll:    result.rows[0],
+      message: {
+        uk: `Опитування ${is_active ? 'активовано' : 'деактивовано'}`,
+        en: `Poll ${is_active ? 'activated' : 'deactivated'} successfully`,
+      },
+      poll: result.rows[0],
     });
   } catch (error) {
-    console.error('Error updating poll status:', error);
+    logger.error('Error updating poll status', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to update poll status',
-      details: error.message,
+      error: { uk: 'Не вдалося змінити статус опитування', en: 'Failed to update poll status' },
     });
   }
 });

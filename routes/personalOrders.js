@@ -1,111 +1,156 @@
+/**
+ * @file Personal Orders REST API routes for MuzaLife.
+ *
+ * Handles creation and management of custom personal orders submitted by users.
+ * All routes require a valid JWT (applied via `router.use(authenticateToken)`).
+ * Admin users can access and manage any order; regular users can only access
+ * their own orders.
+ * @module routes/personalOrders
+ */
+
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Apply authentication middleware to all routes
+// All personal-order routes require a valid JWT
 router.use(authenticateToken);
 
-// Get personal orders for the authenticated user
+// ── Helper: resolve whether the authenticated user is admin ───────────────────
+/**
+ * Returns true if the given user has admin privileges.
+ * @param {number} userId - Authenticated user ID from the JWT.
+ * @returns {Promise<boolean>} True if the user is an admin, false otherwise.
+ */
+const isAdmin = async (userId) => {
+  const result = await query(
+    'SELECT is_admin FROM Users WHERE user_id = $1',
+    [userId],
+  );
+  return result.rows[0]?.is_admin === true;
+};
+
+// ── GET /api/personal-orders ──────────────────────────────────────────────────
+/**
+ * Returns all personal orders belonging to the authenticated user.
+ *
+ * **Auth:** any authenticated user
+ *
+ * **Response:**
+ * ```json
+ * { "success": true, "personalOrders": [ { ...order } ] }
+ * ```
+ */
 router.get('/', async (req, res) => {
   try {
-    const userId = req.userId;
-
     const result = await query(`
       SELECT * FROM PersonalOrders
       WHERE user_id = $1
       ORDER BY order_created_at DESC
-    `, [userId]);
+    `, [req.userId]);
 
-    res.json({
-      success: true,
-      personalOrders: result.rows
-    });
+    res.json({ success: true, personalOrders: result.rows });
   } catch (error) {
-    console.error('Error fetching personal orders:', error);
+    logger.error('Error fetching personal orders', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      userId: req.userId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch personal orders',
-      details: error.message
+      error: { uk: 'Не вдалося отримати замовлення', en: 'Failed to fetch personal orders' },
     });
   }
 });
 
-// Get all personal orders for admin
+// ── GET /api/personal-orders/all ──────────────────────────────────────────────
+/**
+ * Returns all personal orders across all users (admin only).
+ * Includes user name and email joined from the Users table.
+ *
+ * **Auth:** admin
+ *
+ * **Response:**
+ * ```json
+ * { "success": true, "personalOrders": [ { ...order, user_name, user_email } ] }
+ * ```
+ */
 router.get('/all', async (req, res) => {
   try {
-    const userId = req.userId;
-
-    // Check if user is admin by querying database
-    const userResult = await query(
-      'SELECT is_admin FROM Users WHERE user_id = $1',
-      [userId]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found'
-      });
-    }
-
-    const user = userResult.rows[0];
-
-    if (!user.is_admin) {
+    if (!(await isAdmin(req.userId))) {
       return res.status(403).json({
         success: false,
-        error: 'Access denied. Admins only.'
+        error: { uk: 'Доступ лише для адміністраторів', en: 'Access denied. Admins only.' },
       });
     }
 
-    // User is admin, fetch all orders
     const result = await query(`
       SELECT
         po.*,
-        u.name as user_name,
-        u.email as user_email
+        u.name AS user_name,
+        u.email AS user_email
       FROM PersonalOrders po
       JOIN Users u ON po.user_id = u.user_id
       ORDER BY po.order_created_at DESC
     `);
 
-    res.json({
-      success: true,
-      personalOrders: result.rows
-    });
+    res.json({ success: true, personalOrders: result.rows });
   } catch (error) {
-    console.error('Error fetching all personal orders:', error);
+    logger.error('Error fetching all personal orders', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      userId: req.userId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch personal orders',
-      details: error.message
+      error: { uk: 'Не вдалося отримати замовлення', en: 'Failed to fetch personal orders' },
     });
   }
 });
 
-// Add a new personal order
+// ── POST /api/personal-orders ─────────────────────────────────────────────────
+/**
+ * Creates a new personal order for the authenticated user.
+ *
+ * **Auth:** any authenticated user
+ *
+ * **Body:**
+ * - `orderTitle`              {string}  Required
+ * - `orderDescription`        {string}  Required
+ * - `orderMaterialType`       {number}  Required — FK to ProductTypes.product_type_id
+ * - `orderMaterialAgeCategory`{number}  Required — FK to AgeCategories.age_category_id
+ * - `orderStatus`             {string}  Optional — defaults to `'Нове замовлення'`
+ * - `orderPrice`              {number}  Optional — defaults to 0
+ * - `orderDeadline`           {string}  Optional ISO 8601 timestamp
+ *
+ * **Response:** `201` with the created order row.
+ */
 router.post('/', async (req, res) => {
+  const {
+    orderTitle,
+    orderDescription,
+    orderStatus,
+    orderPrice,
+    orderMaterialType,
+    orderMaterialAgeCategory,
+    orderDeadline,
+  } = req.body;
+
+  if (!orderTitle || !orderDescription || !orderMaterialType || !orderMaterialAgeCategory) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        uk: 'Відсутні обов\'язкові поля: orderTitle, orderDescription, orderMaterialType, orderMaterialAgeCategory',
+        en: 'Missing required fields: orderTitle, orderDescription, orderMaterialType, orderMaterialAgeCategory',
+      },
+    });
+  }
+
   try {
-    const userId = req.userId;
-    const {
-      orderTitle,
-      orderDescription,
-      orderStatus,
-      orderPrice,
-      orderMaterialType,
-      orderMaterialAgeCategory,
-      orderDeadline
-    } = req.body;
-
-    // Validate required fields
-    if (!orderTitle || !orderDescription || !orderMaterialType || !orderMaterialAgeCategory) {
-      return res.status(400).json({
-        success: false,
-        error: 'Missing required fields'
-      });
-    }
-
     const result = await query(`
       INSERT INTO PersonalOrders (
         user_id,
@@ -113,247 +158,261 @@ router.post('/', async (req, res) => {
         order_description,
         order_status,
         order_price,
-        order_material_type,
+        order_material_type_id,
         order_material_age_category_id,
         order_deadline
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [
-      userId,
+      req.userId,
       orderTitle,
       orderDescription,
-      orderStatus || 'pending',  // Default status
-      orderPrice || 0,           // Default price
+      orderStatus || 'Нове замовлення',
+      orderPrice  || 0,
       orderMaterialType,
       orderMaterialAgeCategory,
-      orderDeadline || null
+      orderDeadline || null,
     ]);
 
-    res.status(201).json({
-      success: true,
-      personalOrder: result.rows[0]
+    logger.info('Personal order created', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId: result.rows[0].order_id,
+      userId: req.userId,
     });
+
+    res.status(201).json({ success: true, personalOrder: result.rows[0] });
   } catch (error) {
-    console.error('Error creating personal order:', error);
+    logger.error('Error creating personal order', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      userId: req.userId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to create personal order',
-      details: error.message
+      error: { uk: 'Не вдалося створити замовлення', en: 'Failed to create personal order' },
     });
   }
 });
 
-// Get a single personal order by ID
+// ── GET /api/personal-orders/:orderId ─────────────────────────────────────────
+/**
+ * Returns a single personal order by ID.
+ * The authenticated user must own the order, or be an admin.
+ *
+ * **Auth:** owner or admin
+ *
+ * **Response:**
+ * ```json
+ * { "success": true, "personalOrder": { ...order } }
+ * ```
+ */
 router.get('/:orderId', async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderId } = req.params;
+  const { orderId } = req.params;
 
-    // First, check if the order exists and belongs to the user or if user is admin
+  try {
     const orderResult = await query(
       'SELECT * FROM PersonalOrders WHERE order_id = $1',
-      [orderId]
+      [orderId],
     );
 
     if (orderResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'Personal order not found'
+        error: { uk: 'Персональне замовлення не знайдено', en: 'Personal order not found' },
       });
     }
 
     const order = orderResult.rows[0];
 
-    // Check if user owns the order
-    if (order.user_id !== userId) {
-      // User doesn't own the order, check if they're admin
-      const userResult = await query(
-        'SELECT is_admin FROM Users WHERE user_id = $1',
-        [userId]
-      );
-
-      if (userResult.rows.length === 0 || !userResult.rows[0].is_admin) {
+    if (order.user_id !== req.userId) {
+      if (!(await isAdmin(req.userId))) {
         return res.status(403).json({
           success: false,
-          error: 'Not authorized to view this order'
+          error: { uk: 'Немає доступу до цього замовлення', en: 'Not authorized to view this order' },
         });
       }
-      // Admin can view any order
     }
 
-    res.json({
-      success: true,
-      personalOrder: order
-    });
+    res.json({ success: true, personalOrder: order });
   } catch (error) {
-    console.error('Error fetching personal order:', error);
+    logger.error('Error fetching personal order', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      userId: req.userId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch personal order',
-      details: error.message
+      error: { uk: 'Не вдалося отримати замовлення', en: 'Failed to fetch personal order' },
     });
   }
 });
 
-// Update a personal order
+// ── PUT /api/personal-orders/:orderId ─────────────────────────────────────────
+/**
+ * Updates an existing personal order.
+ * The authenticated user must own the order, or be an admin.
+ * Only supplied fields are updated (PATCH semantics).
+ *
+ * **Auth:** owner or admin
+ *
+ * **Body (all optional):**
+ * - `orderTitle`               {string}
+ * - `orderDescription`         {string}
+ * - `orderStatus`              {string}
+ * - `orderPrice`               {number}
+ * - `orderMaterialType`        {number} — FK to ProductTypes.product_type_id
+ * - `orderMaterialAgeCategory` {number} — FK to AgeCategories.age_category_id
+ * - `orderDeadline`            {string} — ISO 8601 timestamp
+ *
+ * **Response:** updated order row.
+ */
 router.put('/:orderId', async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderId } = req.params;
-    const {
-      orderTitle,
-      orderDescription,
-      orderStatus,
-      orderPrice,
-      orderMaterialType,
-      orderMaterialAgeCategory,
-      orderDeadline
-    } = req.body;
+  const { orderId } = req.params;
+  const {
+    orderTitle,
+    orderDescription,
+    orderStatus,
+    orderPrice,
+    orderMaterialType,
+    orderMaterialAgeCategory,
+    orderDeadline,
+  } = req.body;
 
-    // Check if order exists
+  try {
     const checkOwnership = await query(
       'SELECT user_id FROM PersonalOrders WHERE order_id = $1',
-      [orderId]
+      [orderId],
     );
 
     if (checkOwnership.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'Personal order not found'
+        error: { uk: 'Персональне замовлення не знайдено', en: 'Personal order not found' },
       });
     }
 
     const orderUserId = checkOwnership.rows[0].user_id;
 
-    // Check if user is admin
-    const userResult = await query(
-      'SELECT is_admin FROM Users WHERE user_id = $1',
-      [userId]
-    );
-
-    const isAdmin = userResult.rows.length > 0 ? userResult.rows[0].is_admin : false;
-
-    // Only allow update if user owns the order or is admin
-    if (orderUserId !== userId && !isAdmin) {
+    if (orderUserId !== req.userId && !(await isAdmin(req.userId))) {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized to update this order'
+        error: { uk: 'Немає доступу до цього замовлення', en: 'Not authorized to update this order' },
       });
     }
 
-    // Build update query dynamically based on provided fields
     const updates = [];
-    const values = [];
-    let paramIndex = 1;
+    const values  = [];
+    let   idx     = 1;
 
-    if (orderTitle !== undefined) {
-      updates.push(`order_title = $${paramIndex++}`);
-      values.push(orderTitle);
-    }
-    if (orderDescription !== undefined) {
-      updates.push(`order_description = $${paramIndex++}`);
-      values.push(orderDescription);
-    }
-    if (orderStatus !== undefined) {
-      updates.push(`order_status = $${paramIndex++}`);
-      values.push(orderStatus);
-    }
-    if (orderPrice !== undefined) {
-      updates.push(`order_price = $${paramIndex++}`);
-      values.push(orderPrice);
-    }
-    if (orderMaterialType !== undefined) {
-      updates.push(`order_material_type = $${paramIndex++}`);
-      values.push(orderMaterialType);
-    }
-    if (orderMaterialAgeCategory !== undefined) {
-      updates.push(`order_material_age_category_id = $${paramIndex++}`);
-      values.push(orderMaterialAgeCategory);
-    }
-    if (orderDeadline !== undefined) {
-      updates.push(`order_deadline = $${paramIndex++}`);
-      values.push(orderDeadline);
-    }
+    if (orderTitle               !== undefined) { updates.push(`order_title = $${idx++}`);                       values.push(orderTitle); }
+    if (orderDescription         !== undefined) { updates.push(`order_description = $${idx++}`);                 values.push(orderDescription); }
+    if (orderStatus              !== undefined) { updates.push(`order_status = $${idx++}`);                      values.push(orderStatus); }
+    if (orderPrice               !== undefined) { updates.push(`order_price = $${idx++}`);                       values.push(orderPrice); }
+    if (orderMaterialType        !== undefined) { updates.push(`order_material_type_id = $${idx++}`);            values.push(orderMaterialType); }
+    if (orderMaterialAgeCategory !== undefined) { updates.push(`order_material_age_category_id = $${idx++}`);   values.push(orderMaterialAgeCategory); }
+    if (orderDeadline            !== undefined) { updates.push(`order_deadline = $${idx++}`);                    values.push(orderDeadline); }
 
     if (updates.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'No fields to update'
+        error: { uk: 'Немає полів для оновлення', en: 'No fields to update' },
       });
     }
 
     values.push(orderId);
+    const result = await query(
+      `UPDATE PersonalOrders SET ${updates.join(', ')} WHERE order_id = $${idx} RETURNING *`,
+      values,
+    );
 
-    const result = await query(`
-      UPDATE PersonalOrders
-      SET ${updates.join(', ')}
-      WHERE order_id = $${paramIndex}
-      RETURNING *
-    `, values);
-
-    res.json({
-      success: true,
-      personalOrder: result.rows[0]
+    logger.info('Personal order updated', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      userId: req.userId,
     });
+
+    res.json({ success: true, personalOrder: result.rows[0] });
   } catch (error) {
-    console.error('Error updating personal order:', error);
+    logger.error('Error updating personal order', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      userId: req.userId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to update personal order',
-      details: error.message
+      error: { uk: 'Не вдалося оновити замовлення', en: 'Failed to update personal order' },
     });
   }
 });
 
-// Delete a personal order
+// ── DELETE /api/personal-orders/:orderId ──────────────────────────────────────
+/**
+ * Deletes a personal order.
+ * The authenticated user must own the order, or be an admin.
+ *
+ * **Auth:** owner or admin
+ *
+ * **Response:** `{ "success": true, "message": { uk, en } }`
+ */
 router.delete('/:orderId', async (req, res) => {
-  try {
-    const userId = req.userId;
-    const { orderId } = req.params;
+  const { orderId } = req.params;
 
-    // Check if order exists
+  try {
     const checkOwnership = await query(
       'SELECT user_id FROM PersonalOrders WHERE order_id = $1',
-      [orderId]
+      [orderId],
     );
 
     if (checkOwnership.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        error: 'Personal order not found'
+        error: { uk: 'Персональне замовлення не знайдено', en: 'Personal order not found' },
       });
     }
 
     const orderUserId = checkOwnership.rows[0].user_id;
 
-    // Check if user is admin
-    const userResult = await query(
-      'SELECT is_admin FROM Users WHERE user_id = $1',
-      [userId]
-    );
-
-    const isAdmin = userResult.rows.length > 0 ? userResult.rows[0].is_admin : false;
-
-    // Only allow delete if user owns the order or is admin
-    if (orderUserId !== userId && !isAdmin) {
+    if (orderUserId !== req.userId && !(await isAdmin(req.userId))) {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized to delete this order'
+        error: { uk: 'Немає доступу до цього замовлення', en: 'Not authorized to delete this order' },
       });
     }
 
     await query('DELETE FROM PersonalOrders WHERE order_id = $1', [orderId]);
 
+    logger.info('Personal order deleted', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      userId: req.userId,
+    });
+
     res.json({
       success: true,
-      message: 'Personal order deleted successfully'
+      message: {
+        uk: 'Замовлення успішно видалено',
+        en: 'Personal order deleted successfully',
+      },
     });
   } catch (error) {
-    console.error('Error deleting personal order:', error);
+    logger.error('Error deleting personal order', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      userId: req.userId,
+      error: error.message,
+    });
     res.status(500).json({
       success: false,
-      error: 'Failed to delete personal order',
-      details: error.message
+      error: { uk: 'Не вдалося видалити замовлення', en: 'Failed to delete personal order' },
     });
   }
 });
