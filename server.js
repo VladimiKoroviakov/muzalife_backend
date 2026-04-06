@@ -39,7 +39,6 @@ import { performanceMonitor } from './middleware/performanceMonitor.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import faqRoutes from './routes/faqs.js';
-import { productFilesRoutes } from './routes/productFiles.js';
 import reviewRoutes from './routes/reviews.js';
 import productsRouter from './routes/products.js';
 import savedProductsRoutes from './routes/savedProducts.js';
@@ -113,7 +112,6 @@ if (fs.existsSync(swaggerSpecPath)) {
 // ── API routes ────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/product-files', productFilesRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/products', productsRouter);
@@ -166,11 +164,6 @@ app.get('/api/info', (req, res) => {
         getBoughtProducts: 'GET /api/bought-products (protected)',
         addBoughtProduct: 'POST /api/bought-products (protected)',
         removeBoughtProduct: 'DELETE /api/bought-products/:productId (protected)'
-      },
-      productFiles: {
-        uploadFile: 'POST /api/product-files/:productId/upload (protected)',
-        getProductFiles: 'GET /api/product-files/:productId',
-        deleteFile: 'DELETE /api/product-files/:fileId (protected)'
       },
       reviews: {
         getAllReviews: 'GET /api/reviews',
@@ -295,7 +288,6 @@ server.listen(PORT, () => {
   console.log(`   👥 Users: https://localhost:${PORT}/api/users`);
   console.log(`   📦 Products: https://localhost:${PORT}/api/products`);
   console.log(`   💾 Saved Products: https://localhost:${PORT}/api/saved-products`);
-  console.log(`   📁 Product Files: https://localhost:${PORT}/api/product-files`);
   console.log(`   ⭐ Reviews: https://localhost:${PORT}/api/reviews`);
   console.log(`   ❓ FAQs: https://localhost:${PORT}/api/faqs`);
   console.log(`   📊 Polls: https://localhost:${PORT}/api/polls`);

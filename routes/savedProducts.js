@@ -10,7 +10,10 @@ router.get('/ids', authenticateToken, async (req, res) => {
     const userId = req.userId;
 
     const result = await query(
-      'SELECT product_id FROM SavedUserProducts WHERE user_id = $1',
+      `SELECT sup.product_id
+       FROM SavedUserProducts sup
+       JOIN Products p ON p.product_id = sup.product_id
+       WHERE sup.user_id = $1 AND p.product_hidden = false`,
       [userId]
     );
 
@@ -44,7 +47,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // Check if product exists
     const productCheck = await query(
-      'SELECT product_id FROM Products WHERE product_id = $1',
+      'SELECT product_id FROM Products WHERE product_id = $1 AND product_hidden = false',
       [productId]
     );
 

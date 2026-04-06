@@ -95,7 +95,13 @@ const PRODUCT_SELECT = `
 
     ARRAY_AGG(DISTINCT ac.age_category_name) AS ageCategories,
     ARRAY_AGG(DISTINCT e.event_name)         AS events,
-    ARRAY_AGG(DISTINCT i.image_url)          AS additionalImages
+    COALESCE(
+      json_agg(
+        json_build_object('id', i.image_id, 'url', i.image_url)
+        ORDER BY i.image_id
+      ) FILTER (WHERE i.image_id IS NOT NULL),
+      '[]'::json
+    ) AS productImages
 
   FROM products p
   JOIN producttypes pt ON pt.product_type_id = p.product_type_id
@@ -125,7 +131,21 @@ const PRODUCT_GROUP_BY = `
 /**
  * Transforms a raw DB row into the API response shape.
  * @param {object} product - Raw row from the PostgreSQL query.
- * @returns {object}
+ * @returns {object} Transformed product object for API response.  Fields:
+ * - `id`            {number}
+ * - `title`         {string}
+ * - `description`   {string}
+ * - `image`         {string|null} URL of the main image, or null if none
+ * - `price`         {number}
+ * - `rating`        {number}
+ * - `type`          {string} Product type name
+ * - `ageCategory`    {string[]} Array of age category names (empty if none)
+ * - `events`         {string[]} Array of event names (empty if none)
+ * - `additionalImages`   {string[]} Array of additional image URLs (empty if none)
+ * - `additionalImageIds` {number[]} IDs matching each entry in `additionalImages` (same order)
+ * - `createdAt`      {string} ISO timestamp
+ * - `updatedAt`      {string} ISO timestamp
+ * Note: the `ageCategory` and `events` fields are aggregated as arrays in the SQL query;
  */
 const transformProduct = (product) => ({
   id: product.id,
@@ -139,7 +159,8 @@ const transformProduct = (product) => ({
   description:      product.description,
   createdAt:        product.createdat,
   updatedAt:        product.updatedat,
-  additionalImages: (product.additionalimages || []).filter(Boolean),
+  additionalImages:   (product.additionalimages   || []).filter(Boolean),
+  additionalImageIds: (product.additionalimageid || []).filter(Boolean).map(Number),
 });
 
 // ── Helper: fire-and-forget view tracking ─────────────────────────────────────
@@ -176,12 +197,16 @@ const isAdmin = async (client, userId) => {
 };
 
 // ── Helper: move uploaded file to the product directory ───────────────────────
-const moveToProductDir = (file, productId) => {
+const moveToProductDir = (file, productId, baseUrl = '') => {
   const destDir = path.join(UPLOADS_DIR, 'products', String(productId));
   if (!fs.existsSync(destDir)) { fs.mkdirSync(destDir, { recursive: true }); }
   const destPath = path.join(destDir, file.filename);
   fs.renameSync(file.path, destPath);
-  return `/uploads/products/${productId}/${file.filename}`;
+
+  const relativePath = `/uploads/products/${productId}/${file.filename}`;
+
+  // Store absolute URL for consistency with existing data
+  return baseUrl ? `${baseUrl}${relativePath}` : relativePath;
 };
 
 // ── Helper: clean up temp files on error ─────────────────────────────────────
@@ -220,7 +245,7 @@ router.get('/', async (req, res) => {
 
   res.setHeader('X-Cache', 'MISS');
   try {
-    const queryText = `${PRODUCT_SELECT} ${PRODUCT_GROUP_BY} ORDER BY p.product_id`;
+    const queryText = `${PRODUCT_SELECT} WHERE p.product_hidden = false ${PRODUCT_GROUP_BY} ORDER BY p.product_id`;
     const dbStart   = Date.now();
     const result    = await pool.query(queryText);
     const dbMs      = Date.now() - dbStart;
@@ -271,7 +296,7 @@ router.get('/:id', async (req, res) => {
 
   res.setHeader('X-Cache', 'MISS');
   try {
-    const queryText = `${PRODUCT_SELECT} WHERE p.product_id = $1 ${PRODUCT_GROUP_BY}`;
+    const queryText = `${PRODUCT_SELECT} WHERE p.product_id = $1 AND p.product_hidden = false ${PRODUCT_GROUP_BY}`;
     const result    = await pool.query(queryText, [productId]);
 
     if (result.rows.length === 0) {
@@ -354,12 +379,19 @@ router.post('/', authenticateToken, (req, res, next) => {
       return res.status(400).json({ success: false, error: 'price and typeId must be numbers' });
     }
 
+    if (!req.files?.mainImage?.[0]) {
+      await client.query('ROLLBACK');
+      cleanupTempFiles(req.files);
+      return res.status(400).json({ success: false, error: 'mainImage is required' });
+    }
+
     // ── Insert core product record ────────────────────────────────────────────
     const productResult = await client.query(`
       INSERT INTO Products (
         product_title, product_description, product_price,
-        product_type_id, product_hidden, product_rating
-      ) VALUES ($1, $2, $3, $4, $5, 0)
+        product_type_id, product_hidden, product_rating,
+        product_main_img_url
+      ) VALUES ($1, $2, $3, $4, $5, 0, '')
       RETURNING product_id
     `, [
       title,
@@ -460,10 +492,13 @@ router.post('/', authenticateToken, (req, res, next) => {
       requestId: req.requestId,
     });
 
+    const newProduct = await client.query(
+      `${PRODUCT_SELECT} WHERE p.product_id = $1 ${PRODUCT_GROUP_BY}`,
+      [productId]
+    );
     res.status(201).json({
       success: true,
-      productId,
-      message: 'Product created successfully',
+      product: transformProduct(newProduct.rows[0])
     });
 
   } catch (error) {
@@ -477,6 +512,50 @@ router.post('/', authenticateToken, (req, res, next) => {
     });
 
     res.status(500).json({ success: false, error: 'Failed to create product' });
+  } finally {
+    client.release();
+  }
+});
+
+// ── GET /api/products/:id/files ──────────────────────────────────────────────
+/**
+ * Returns the downloadable files attached to a product (admin only).
+ * @returns `{ success: true, files: [{ fileId, fileName, fileUrl, fileSize }] }`
+ */
+router.get('/:id/files', authenticateToken, async (req, res) => {
+  const productId = parseInt(req.params.id, 10);
+
+  if (isNaN(productId)) {
+    return res.status(400).json({ success: false, error: 'Invalid product ID' });
+  }
+
+  const client = await pool.connect();
+  try {
+    if (!(await isAdmin(client, req.userId))) {
+      return res.status(403).json({ success: false, error: 'Admins only' });
+    }
+
+    const result = await client.query(`
+      SELECT
+        f.file_id   AS "fileId",
+        f.file_name AS "fileName",
+        f.file_url  AS "fileUrl",
+        f.file_size AS "fileSize"
+      FROM Files f
+      JOIN ProductFiles pf ON pf.file_id = f.file_id
+      WHERE pf.product_id = $1
+      ORDER BY f.file_id
+    `, [productId]);
+
+    res.json({ success: true, files: result.rows });
+  } catch (error) {
+    logger.error('Error fetching product files', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      productId,
+      error: error.message,
+    });
+    res.status(500).json({ success: false, error: 'Failed to fetch product files' });
   } finally {
     client.release();
   }
@@ -517,6 +596,9 @@ router.put('/:id', authenticateToken, (req, res, next) => {
 
   const client = await pool.connect();
 
+  // Get base URL for absolute paths
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+
   try {
     await client.query('BEGIN');
 
@@ -544,6 +626,7 @@ router.put('/:id', authenticateToken, (req, res, next) => {
       title, description, price, typeId, hidden,
       ageCategoryIds, eventIds,
       removeFileIds, removeImageIds,
+      removeMainImage,  // Add this to handle main image removal
     } = req.body;
 
     const setClauses = [];
@@ -558,9 +641,46 @@ router.put('/:id', authenticateToken, (req, res, next) => {
     if (typeId      !== undefined) { push('product_type_id',     parseInt(typeId, 10));     }
     if (hidden      !== undefined) { push('product_hidden',      hidden === 'true' || hidden === true); }
 
+    // ── Handle main image removal ─────────────────────────────────────────────
+    if (removeMainImage === 'true' || removeMainImage === true) {
+      // Get current main image URL to delete from disk
+      const currentProduct = await client.query(
+        'SELECT product_main_img_url FROM Products WHERE product_id = $1',
+        [productId]
+      );
+
+      if (currentProduct.rows[0]?.product_main_img_url) {
+        const oldImagePath = currentProduct.rows[0].product_main_img_url;
+        // Remove base URL to get relative path for disk
+        const relativePath = oldImagePath.replace(/^https?:\/\/[^/]+/, '');
+        const diskPath = path.join(__dirname, '..', relativePath);
+        if (fs.existsSync(diskPath)) {
+          fs.unlinkSync(diskPath);
+        }
+      }
+      push('product_main_img_url', '');
+    }
+
     // ── Handle new main image ────────────────────────────────────────────────
     if (req.files?.mainImage?.[0]) {
-      const imageUrl = moveToProductDir(req.files.mainImage[0], productId);
+      // If there's an existing main image and we're replacing it, delete the old one
+      if (!removeMainImage) {
+        const currentProduct = await client.query(
+          'SELECT product_main_img_url FROM Products WHERE product_id = $1',
+          [productId]
+        );
+
+        if (currentProduct.rows[0]?.product_main_img_url) {
+          const oldImagePath = currentProduct.rows[0].product_main_img_url;
+          const relativePath = oldImagePath.replace(/^https?:\/\/[^/]+/, '');
+          const diskPath = path.join(__dirname, '..', relativePath);
+          if (fs.existsSync(diskPath)) {
+            fs.unlinkSync(diskPath);
+          }
+        }
+      }
+
+      const imageUrl = moveToProductDir(req.files.mainImage[0], productId, baseUrl);
       push('product_main_img_url', imageUrl);
     }
 
@@ -586,7 +706,9 @@ router.put('/:id', authenticateToken, (req, res, next) => {
           [fileId],
         );
         if (fRow.rows[0]) {
-          const diskPath = path.join(__dirname, '..', fRow.rows[0].file_url);
+          // Remove base URL to get relative path for disk
+          const relativePath = fRow.rows[0].file_url.replace(/^https?:\/\/[^/]+/, '');
+          const diskPath = path.join(__dirname, '..', relativePath);
           if (fs.existsSync(diskPath)) { fs.unlinkSync(diskPath); }
         }
         await client.query('DELETE FROM ProductFiles WHERE file_id = $1', [fileId]);
@@ -605,7 +727,9 @@ router.put('/:id', authenticateToken, (req, res, next) => {
           [imageId],
         );
         if (iRow.rows[0]) {
-          const diskPath = path.join(__dirname, '..', iRow.rows[0].image_url);
+          // Remove base URL to get relative path for disk
+          const relativePath = iRow.rows[0].image_url.replace(/^https?:\/\/[^/]+/, '');
+          const diskPath = path.join(__dirname, '..', relativePath);
           if (fs.existsSync(diskPath)) { fs.unlinkSync(diskPath); }
         }
         await client.query('DELETE FROM ProductImages WHERE image_id = $1', [imageId]);
@@ -616,7 +740,7 @@ router.put('/:id', authenticateToken, (req, res, next) => {
     // ── Add new gallery images ────────────────────────────────────────────────
     if (req.files?.images?.length) {
       for (const file of req.files.images) {
-        const imageUrl = moveToProductDir(file, productId);
+        const imageUrl = moveToProductDir(file, productId, baseUrl);
         const imgRow   = await client.query(
           'INSERT INTO Images (image_url) VALUES ($1) RETURNING image_id',
           [imageUrl],
@@ -631,7 +755,7 @@ router.put('/:id', authenticateToken, (req, res, next) => {
     // ── Add new downloadable files ────────────────────────────────────────────
     if (req.files?.files?.length) {
       for (const file of req.files.files) {
-        const fileUrl = moveToProductDir(file, productId);
+        const fileUrl = moveToProductDir(file, productId, baseUrl);
         const fRow    = await client.query(`
           INSERT INTO Files (file_name, file_url, file_size) VALUES ($1, $2, $3)
           RETURNING file_id
@@ -695,6 +819,7 @@ router.put('/:id', authenticateToken, (req, res, next) => {
       requestId: req.requestId,
       productId,
       error: error.message,
+      stack: error.stack,
     });
 
     res.status(500).json({ success: false, error: 'Failed to update product' });
@@ -744,6 +869,31 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     if (exists.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+
+    // ── Guard: hide instead of delete if product was ever purchased ──────────
+    const boughtCheck = await client.query(
+      'SELECT 1 FROM BoughtUserProducts WHERE product_id = $1 LIMIT 1',
+      [productId],
+    );
+
+    if (boughtCheck.rows.length > 0) {
+      await client.query(
+        'UPDATE Products SET product_hidden = true WHERE product_id = $1',
+        [productId],
+      );
+      await client.query('COMMIT');
+
+      appCache.invalidate(`products:${productId}`);
+      appCache.invalidate('products:all');
+
+      logger.info('Product hidden (has purchases) instead of deleted', {
+        module: 'routes/products',
+        productId,
+        requestId: req.requestId,
+      });
+
+      return res.json({ success: true, hidden: true, message: 'Product has purchases and was hidden instead of deleted' });
     }
 
     // ── Collect file paths before deleting ────────────────────────────────────

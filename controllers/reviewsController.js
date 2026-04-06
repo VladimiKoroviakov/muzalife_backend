@@ -23,7 +23,9 @@ export const getProductReviews = async (req, res) => {
       FROM Reviews r
       JOIN ProductReviews pr ON r.review_id = pr.review_id
       JOIN Users u ON pr.user_id = u.user_id
+      JOIN Products p ON p.product_id = pr.product_id
       WHERE pr.product_id = $1
+        AND p.product_hidden = false
       ORDER BY pr.review_created_at DESC
     `;
 
@@ -79,7 +81,9 @@ export const getReviewsByUser = async (req, res) => {
       FROM Reviews r
       INNER JOIN ProductReviews pr ON r.review_id = pr.review_id
       INNER JOIN Users u ON pr.user_id = u.user_id
+      INNER JOIN Products p ON p.product_id = pr.product_id
       WHERE pr.user_id = $1
+        AND p.product_hidden = false
       ORDER BY pr.review_created_at DESC
     `;
 
@@ -119,6 +123,15 @@ export const submitReview = async (req, res) => {
 
     if (existingReview.rows.length > 0) {
       return res.status(409).json({ error: 'You have already reviewed this product' });
+    }
+
+    // Check product exists and is visible
+    const productCheck = await pool.query(
+      'SELECT product_id FROM Products WHERE product_id = $1 AND product_hidden = false',
+      [productId],
+    );
+    if (productCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Product not found. It may have been removed or never existed.' });
     }
 
     // Start transaction

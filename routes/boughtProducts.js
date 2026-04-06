@@ -4,27 +4,43 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get bought product IDs (similar to saved products /ids endpoint)
-router.get('/ids', authenticateToken, async (req, res) => {
+// Get full bought products
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId;
 
     const result = await query(
-      'SELECT product_id FROM BoughtUserProducts WHERE user_id = $1 ORDER BY bought_at DESC',
+      `SELECT
+        p.product_id AS id,
+        p.product_title AS title,
+        pt.product_type_name AS type,
+        p.product_hidden AS hidden,
+        bup.bought_at AS boughtAt
+      FROM BoughtUserProducts bup
+      JOIN Products p      ON p.product_id = bup.product_id
+      JOIN ProductTypes pt ON pt.product_type_id = p.product_type_id
+      WHERE bup.user_id = $1
+      ORDER BY bup.bought_at DESC`,
       [userId]
     );
 
-    const productIds = result.rows.map((row) => row.product_id);
+    const products = result.rows.map((p) => ({
+      id: p.id,
+      title: p.title,
+      type: p.type,
+      boughtAt: p.boughtat,
+      hidden: p.hidden
+    }));
 
     res.json({
       success: true,
-      data: productIds
+      data: products
     });
   } catch (error) {
-    console.error('Error fetching bought product IDs:', error);
+    console.error('Error fetching bought products:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch bought product IDs'
+      error: 'Failed to fetch bought products'
     });
   }
 });
@@ -44,7 +60,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     // Check if product exists
     const productCheck = await query(
-      'SELECT product_id FROM Products WHERE product_id = $1',
+      'SELECT product_id FROM Products WHERE product_id = $1 AND product_hidden = false',
       [productId]
     );
 

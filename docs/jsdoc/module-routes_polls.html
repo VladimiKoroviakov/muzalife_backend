@@ -39,12 +39,16 @@
     
         
             <div class="description"><p>Polls REST API routes for MuzaLife.</p>
-<p>Handles poll CRUD, user voting, and result aggregation.</p>
-<p><strong>Key fixes applied vs the original draft:</strong></p>
+<p>Handles poll creation, user voting, status management, and result aggregation.</p>
+<p><strong>Auth summary:</strong></p>
 <ul>
-<li>All admin routes now read <code>req.userId</code> (set by <code>authenticateToken</code>) instead
-of the non-existent <code>req.user.user_id</code>.</li>
-<li>Added <code>GET /api/polls/results</code> — returns vote counts for <strong>all</strong> polls.</li>
+<li><code>GET /</code>                  — authenticated users (active polls + per-user vote state)</li>
+<li><code>GET /results</code>           — admin only (all polls, all vote counts)</li>
+<li><code>GET /:pollId</code>           — authenticated users</li>
+<li><code>POST /</code>                 — admin only (create poll)</li>
+<li><code>POST /:pollId/vote</code>     — authenticated users</li>
+<li><code>GET /:pollId/results</code>   — public (single-poll result)</li>
+<li><code>PUT /:pollId/status</code>    — admin only (activate / deactivate)</li>
 </ul></div>
         
 
@@ -143,6 +147,169 @@ of the non-existent <code>req.user.user_id</code>.</li>
     
 
     
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~isAdmin"><span class="type-signature">(async, inner) </span>isAdmin<span class="signature">(userId)</span><span class="type-signature"> &rarr; {Promise.&lt;boolean>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Returns true if the given user has admin privileges.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>userId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Authenticated user ID from the JWT.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="routes_polls.js.html">routes/polls.js</a>, <a href="routes_polls.js.html#line30">line 30</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>True if the user is an admin, false otherwise.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;boolean></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+    
 
     
 
@@ -157,7 +324,7 @@ of the non-existent <code>req.user.user_id</code>.</li>
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_analytics.html">routes/analytics</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_polls.html">routes/polls</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_analytics.html">routes/analytics</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_personalOrders.html">routes/personalOrders</a></li><li><a href="module-routes_polls.html">routes/polls</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
 </nav>
 
 <br class="clear">

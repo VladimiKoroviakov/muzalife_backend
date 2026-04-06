@@ -167,3 +167,5 @@ export const TTL_PRODUCT_SINGLE = 5 * 60 * 1000;
 export const TTL_FAQS           = 10 * 60 * 1000;
 /** TTL for poll data (2 minutes — votes can come in quickly). */
 export const TTL_POLLS          = 2 * 60 * 1000;
+/** TTL for product metadata (types, age categories, events) — 1 hour (changes very rarely). */
+export const TTL_METADATA       = 60 * 60 * 1000;
