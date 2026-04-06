@@ -310,7 +310,7 @@ must never degrade the product detail response.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="routes_products.js.html">routes/products.js</a>, <a href="routes_products.js.html#line155">line 155</a>
+        <a href="routes_products.js.html">routes/products.js</a>, <a href="routes_products.js.html#line176">line 176</a>
     </li></ul></dd>
     
 
@@ -469,7 +469,7 @@ must never degrade the product detail response.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="routes_products.js.html">routes/products.js</a>, <a href="routes_products.js.html#line130">line 130</a>
+        <a href="routes_products.js.html">routes/products.js</a>, <a href="routes_products.js.html#line150">line 150</a>
     </li></ul></dd>
     
 
@@ -497,6 +497,26 @@ must never degrade the product detail response.</p>
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    <p>Transformed product object for API response.  Fields:</p>
+<ul>
+<li><code>id</code>            {number}</li>
+<li><code>title</code>         {string}</li>
+<li><code>description</code>   {string}</li>
+<li><code>image</code>         {string|null} URL of the main image, or null if none</li>
+<li><code>price</code>         {number}</li>
+<li><code>rating</code>        {number}</li>
+<li><code>type</code>          {string} Product type name</li>
+<li><code>ageCategory</code>    {string[]} Array of age category names (empty if none)</li>
+<li><code>events</code>         {string[]} Array of event names (empty if none)</li>
+<li><code>additionalImages</code>   {string[]} Array of additional image URLs (empty if none)</li>
+<li><code>additionalImageIds</code> {number[]} IDs matching each entry in <code>additionalImages</code> (same order)</li>
+<li><code>createdAt</code>      {string} ISO timestamp</li>
+<li><code>updatedAt</code>      {string} ISO timestamp
+Note: the <code>ageCategory</code> and <code>events</code> fields are aggregated as arrays in the SQL query;</li>
+</ul>
+</div>
+
 
 
 <dl>

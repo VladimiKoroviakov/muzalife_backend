@@ -118,8 +118,8 @@ router.get('/all', async (req, res) => {
     const result = await query(`
       SELECT
         po.*,
-        u.name AS user_name,
-        u.email AS user_email
+        u.user_name,
+        u.user_email
       FROM PersonalOrders po
       JOIN Users u ON po.user_id = u.user_id
       ORDER BY po.order_created_at DESC

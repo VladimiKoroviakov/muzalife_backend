@@ -48,6 +48,8 @@ import personalOrdersRoutes from './routes/personalOrders.js';
 import boughtProductsRoutes from './routes/boughtProducts.js';
 import clientErrorsRouter from './routes/clientErrors.js';
 import apmRouter from './routes/apm.js';
+import metadataRouter from './routes/metadata.js';
+
 
 import { query } from './config/database.js';
 
@@ -115,6 +117,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/products', productsRouter);
+app.use('/api/metadata', metadataRouter);
 app.use('/api/saved-products', savedProductsRoutes);
 app.use('/api/polls', pollRoutes);
 app.use('/api/analytics', analytics);
@@ -152,6 +155,11 @@ app.get('/api/info', (req, res) => {
         createProduct: 'POST /api/products (protected)',
         updateProduct: 'PUT /api/products/:id (protected)',
         deleteProduct: 'DELETE /api/products/:id (protected)',
+      },
+      metadata: {
+        getProductTypes: 'GET /api/metadata/product-types',
+        getAgeCategories: 'GET /api/metadata/age-categories',
+        getEvents: 'GET /api/metadata/events',
       },
       savedProducts: {
         getSavedProducts: 'GET /api/saved-products (protected)',
