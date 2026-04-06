@@ -512,7 +512,9 @@ router.post('/', authenticateToken, (req, res, next) => {
 // ── GET /api/products/:id/files ──────────────────────────────────────────────
 /**
  * Returns the downloadable files attached to a product (admin only).
- * @returns `{ success: true, files: [{ fileId, fileName, fileUrl, fileSize }] }`
+ * @returns {Promise<object>} A response object containing:
+ * - `success` {boolean} Whether the operation was successful.
+ * - `files` {Array<{fileId: number, fileName: string, fileUrl: string, fileSize: number}>} List of files.
  */
 router.get('/:id/files', authenticateToken, async (req, res) => {
   const productId = parseInt(req.params.id, 10);

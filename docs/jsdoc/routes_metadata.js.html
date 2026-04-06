@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: config/database</title>
+    <title>JSDoc: Source: routes/metadata.js</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,297 +17,74 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: config/database</h1>
-
-    
-
-
-
-
-<section>
-
-<header>
-    
-        
-            
-        
-    
-</header>
-
-<article>
-    <div class="container-overview">
-    
-        
-            <div class="description"><p>PostgreSQL database connection pool configuration.</p>
-<p>This module creates and exports a shared PostgreSQL connection pool used
-throughout the application. All database credentials are loaded from
-environment variables so that no secrets are hard-coded in source control.</p>
-<p><strong>Architectural decision:</strong> a single shared pool is used (singleton pattern)
-to limit the total number of open connections and avoid connection exhaustion
-under high concurrency.</p></div>
-        
-
-        
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="config_database.js.html">config/database.js</a>, <a href="config_database.js.html#line1">line 1</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-    <dt class="tag-see">See:</dt>
-    <dd class="tag-see">
-        <ul>
-            <li><a href="https://node-postgres.com/apis/pool">node-postgres Pool docs</a></li>
-        </ul>
-    </dd>
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        
-    
-    </div>
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id=".query"><span class="type-signature">(static, constant) </span>query<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Executes a parameterised SQL query against the shared connection pool.</p>
-<p>This is the primary way every module in the application talks to the
-database. Parameterised queries (<code>$1</code>, <code>$2</code>, …) are used exclusively to
-prevent SQL-injection attacks.</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="config_database.js.html">config/database.js</a>, <a href="config_database.js.html#line72">line 72</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>import { query } from './config/database.js';
-
-const result = await query('SELECT * FROM Users WHERE user_id = $1', [42]);
-console.log(result.rows[0]);</code></pre>
-
-
-
-        
-            
-<h4 class="name" id="~pool"><span class="type-signature">(inner, constant) </span>pool<span class="type-signature"> :Object</span></h4>
-
-
-
-
-<div class="description">
-    <p>Shared PostgreSQL connection pool.</p>
-<p>The pool automatically manages a set of reusable database connections.
-Connection limits and idle timeouts are governed by <code>pg</code> defaults unless
-explicitly overridden via environment variables.</p>
-</div>
-
-
-
-    <h5>Type:</h5>
-    <ul>
-        <li>
-            
-<span class="param-type">Object</span>
-
-
-        </li>
-    </ul>
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="config_database.js.html">config/database.js</a>, <a href="config_database.js.html#line32">line 32</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-    
-
-    
-
-    
-
-    
-</article>
-
-</section>
+    <h1 class="page-title">Source: routes/metadata.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import express from 'express';
+import pool from '../config/database.js';
+import { appCache } from '../utils/cache.js';
+import logger from '../utils/logger.js';
+
+const router = express.Router();
+
+// Cache TTL for metadata (e.g., 1 hour, as it rarely changes)
+const TTL_METADATA = 60 * 60 * 1000;
+
+/**
+ * Generic helper to fetch lookup tables
+ * @param req
+ * @param res
+ * @param {string} key - Cache key
+ * @param {string} query - SQL Query
+ */
+async function getLookupData(req, res, key, query) {
+  const cached = appCache.get(key);
+  if (cached) {
+    return res.json({ success: true, data: cached });
+  }
+
+  try {
+    const result = await pool.query(query);
+    appCache.set(key, result.rows, TTL_METADATA);
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    logger.error(`Error fetching metadata [${key}]`, {
+      module: 'routes/metadata',
+      requestId: req.requestId,
+      error: error.message,
+    });
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+}
+
+// ── GET /api/metadata/types ──────────────────────────────────────────────────
+router.get('/types', (req, res) => {
+  const query = 'SELECT product_type_id AS id, product_type_name AS name FROM ProductTypes ORDER BY name ASC';
+  getLookupData(req, res, 'meta:types', query);
+});
+
+// ── GET /api/metadata/age-categories ─────────────────────────────────────────
+router.get('/age-categories', (req, res) => {
+  const query = 'SELECT age_category_id AS id, age_category_name AS name FROM AgeCategories ORDER BY age_category_id ASC';
+  getLookupData(req, res, 'meta:age_cats', query);
+});
+
+// ── GET /api/metadata/events ─────────────────────────────────────────────────
+router.get('/events', (req, res) => {
+  const query = 'SELECT event_id AS id, event_name AS name FROM Events ORDER BY name ASC';
+  getLookupData(req, res, 'meta:events', query);
+});
+
+export default router;
+</code></pre>
+        </article>
+    </section>
 
 
 
