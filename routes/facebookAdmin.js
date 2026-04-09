@@ -65,9 +65,9 @@ router.use(authenticateToken);
 /**
  * Verifies that the authenticated user is an admin.
  * Rejects the request with 403 if not.
- * @param {import('express').Request} req - Express request object.
- * @param {import('express').Response} res - Express response object.
- * @param {import('express').NextFunction} next - Express next function.
+ * @param {object} req - Express request object.
+ * @param {object} res - Express response object.
+ * @param {Function} next - Express next function.
  * @returns {Promise<void>}
  */
 const requireAdmin = async (req, res, next) => {
