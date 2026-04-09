@@ -519,6 +519,63 @@ router.get('/:pollId/results', async (req, res) => {
   }
 });
 
+// ── DELETE /api/polls/:pollId ─────────────────────────────────────────────────
+/**
+ * Permanently deletes a poll and all its options and user votes (admin only).
+ *
+ * **Auth:** admin
+ *
+ * **Response:** `{ "success": true }`
+ */
+router.delete('/:pollId', authenticateToken, async (req, res) => {
+  const { pollId } = req.params;
+
+  try {
+    if (!(await isAdmin(req.userId))) {
+      return res.status(403).json({
+        success: false,
+        error: { uk: 'Лише адміністратори можуть видаляти опитування', en: 'Only administrators can delete polls' },
+      });
+    }
+
+    const pollCheck = await query('SELECT poll_id FROM Polls WHERE poll_id = $1', [pollId]);
+    if (pollCheck.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: { uk: 'Опитування не знайдено', en: 'Poll not found' },
+      });
+    }
+
+    // Delete in FK order: user votes → options → poll
+    await query(
+      'DELETE FROM PollUserVotes WHERE vote_id IN (SELECT vote_id FROM PollVotes WHERE poll_id = $1)',
+      [pollId],
+    );
+    await query('DELETE FROM PollVotes WHERE poll_id = $1', [pollId]);
+    await query('DELETE FROM Polls WHERE poll_id = $1', [pollId]);
+
+    logger.info('Poll deleted', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      userId: req.userId,
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Error deleting poll', {
+      module: 'routes/polls',
+      requestId: req.requestId,
+      pollId,
+      error: error.message,
+    });
+    res.status(500).json({
+      success: false,
+      error: { uk: 'Не вдалося видалити опитування', en: 'Failed to delete poll' },
+    });
+  }
+});
+
 // ── PUT /api/polls/:pollId/status ─────────────────────────────────────────────
 /**
  * Activates or deactivates a poll (admin only).
