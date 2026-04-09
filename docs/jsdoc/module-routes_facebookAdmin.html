@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: EmailService</title>
+    <title>JSDoc: Module: routes/facebookAdmin</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: EmailService</h1>
+    <h1 class="page-title">Module: routes/facebookAdmin</h1>
 
     
 
@@ -28,10 +28,8 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>
-            <span class="ancestors"><a href="module-services_emailService.html">services/emailService</a>~</span>EmailService<span class="signature">()</span><span class="type-signature"></span></h2>
         
-            <div class="class-description"><p>Service responsible for sending transactional emails via SMTP.</p></div>
+            
         
     
 </header>
@@ -40,25 +38,25 @@
     <div class="container-overview">
     
         
+            <div class="description"><p>Admin Facebook posting route for MuzaLife.</p>
+<p>Provides a single admin-only endpoint that publishes a product promotion
+to the Muzalife Facebook page via the Graph API (v20.0).</p>
+<p><strong>Image resolution strategy:</strong></p>
+<ul>
+<li>If the admin uploads images in the request, those are forwarded to Facebook.</li>
+<li>Otherwise the product's stored main image is read from disk and uploaded.</li>
+</ul>
+<p><strong>Environment variables required:</strong></p>
+<ul>
+<li><code>FACEBOOK_PAGE_ID</code>           — numeric ID of the target Facebook page.</li>
+<li><code>FACEBOOK_PAGE_ACCESS_TOKEN</code> — long-lived page access token.</li>
+</ul></div>
+        
 
-    
-    <h2>Constructor</h2>
-    
-
-    
-    <h4 class="name" id="EmailService"><span class="type-signature"></span>new EmailService<span class="signature">()</span><span class="type-signature"></span></h4>
-    
-
-    
+        
+            
 
 
-
-<div class="description">
-    <p>Initialises the service and creates the underlying nodemailer transporter.</p>
-<p>The constructor intentionally does not throw on SMTP configuration errors
-(e.g. missing env vars) — it only logs warnings so that other server
-functionality remains available.</p>
-</div>
 
 
 
@@ -101,7 +99,7 @@ functionality remains available.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line24">line 24</a>
+        <a href="routes_facebookAdmin.js.html">routes/facebookAdmin.js</a>, <a href="routes_facebookAdmin.js.html#line1">line 1</a>
     </li></ul></dd>
     
 
@@ -131,6 +129,7 @@ functionality remains available.</p>
 
 
 
+        
     
     </div>
 
@@ -157,7 +156,7 @@ functionality remains available.</p>
     
 
     
-    <h4 class="name" id="createTransporter"><span class="type-signature"></span>createTransporter<span class="signature">()</span><span class="type-signature"> &rarr; {Object|undefined}</span></h4>
+    <h4 class="name" id="~localPathFromUrl"><span class="type-signature">(inner) </span>localPathFromUrl<span class="signature">(imageUrl)</span><span class="type-signature"> &rarr; {string}</span></h4>
     
 
     
@@ -165,133 +164,8 @@ functionality remains available.</p>
 
 
 <div class="description">
-    <p>Creates and returns a configured <code>nodemailer</code> SMTP transporter.</p>
-<p>Reads SMTP settings from environment variables with sensible defaults.
-After creation, calls <code>transporter.verify()</code> to assert connectivity and
-logs the result.</p>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line49">line 49</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    <p>The nodemailer
-transporter, or <code>undefined</code> if creation fails.</p>
-</div>
-
-
-
-<dl>
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Object</span>
-|
-
-<span class="param-type">undefined</span>
-
-
-    </dd>
-</dl>
-
-    
-
-
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>// Called automatically by the constructor — not meant for external use.</code></pre>
-
-
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="extractVerificationCode"><span class="type-signature"></span>extractVerificationCode<span class="signature">(html)</span><span class="type-signature"> &rarr; {string}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    <p>Extracts a 6-digit numeric verification code from an HTML email body.</p>
-<p>Used primarily in integration tests to retrieve the code from the
-rendered HTML without actually receiving the email.</p>
-<p><strong>Algorithm:</strong> searches for the first occurrence of <code>&gt;NNNNNN&lt;</code> where
-<code>N</code> is a digit (matches the code rendered inside an HTML tag).</p>
+    <p>Derives the absolute local file-system path for a product image that is
+served under the <code>/uploads/</code> static route.</p>
 </div>
 
 
@@ -327,7 +201,7 @@ rendered HTML without actually receiving the email.</p>
 
         <tr>
             
-                <td class="name"><code>html</code></td>
+                <td class="name"><code>imageUrl</code></td>
             
 
             <td class="type">
@@ -343,7 +217,8 @@ rendered HTML without actually receiving the email.</p>
 
             
 
-            <td class="description last"><p>Raw HTML string of the email body.</p></td>
+            <td class="description last"><p>Full URL as stored in the DB
+(e.g. <code>https://localhost:5001/uploads/products/3/main.jpg</code>).</p></td>
         </tr>
 
     
@@ -384,7 +259,7 @@ rendered HTML without actually receiving the email.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line106">line 106</a>
+        <a href="routes_facebookAdmin.js.html">routes/facebookAdmin.js</a>, <a href="routes_facebookAdmin.js.html#line138">line 138</a>
     </li></ul></dd>
     
 
@@ -413,8 +288,7 @@ rendered HTML without actually receiving the email.</p>
 
         
 <div class="param-desc">
-    <p>The 6-digit code, or <code>'Not found in HTML'</code> if the
-pattern is absent.</p>
+    <p>Absolute path on disk.</p>
 </div>
 
 
@@ -436,10 +310,164 @@ pattern is absent.</p>
 
 
 
-    <h5>Example</h5>
+
+        
+            
+
     
-    <pre class="prettyprint"><code>const code = emailService.extractVerificationCode('&lt;h3>483920&lt;/h3>');
-console.log(code); // '483920'</code></pre>
+
+    
+    <h4 class="name" id="~mimeFromPath"><span class="type-signature">(inner) </span>mimeFromPath<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Infers the MIME type from a file path or URL based on its extension.
+Defaults to <code>image/jpeg</code> for unknown extensions.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>File path or URL.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="routes_facebookAdmin.js.html">routes/facebookAdmin.js</a>, <a href="routes_facebookAdmin.js.html#line150">line 150</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>MIME type string.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
 
 
 
@@ -449,7 +477,7 @@ console.log(code); // '483920'</code></pre>
     
 
     
-    <h4 class="name" id="sendVerificationEmail"><span class="type-signature">(async) </span>sendVerificationEmail<span class="signature">(email, verificationCode, verification_type<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;true>}</span></h4>
+    <h4 class="name" id="~requireAdmin"><span class="type-signature">(async, inner) </span>requireAdmin<span class="signature">(req, res, next)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
     
 
     
@@ -457,10 +485,211 @@ console.log(code); // '483920'</code></pre>
 
 
 <div class="description">
-    <p>Sends a verification email containing a one-time code to the given address.</p>
-<p>The email is bilingual-ready but currently rendered in Ukrainian.  The
-subject line and body copy differ slightly between <code>'registration'</code> and
-<code>'email_change'</code> flows.</p>
+    <p>Verifies that the authenticated user is an admin.
+Rejects the request with 403 if not.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>req</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Express request object.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>res</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Express response object.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>next</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Express next function.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="routes_facebookAdmin.js.html">routes/facebookAdmin.js</a>, <a href="routes_facebookAdmin.js.html#line73">line 73</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~uploadPhoto"><span class="type-signature">(async, inner) </span>uploadPhoto<span class="signature">(filePath, mimeType, pageId, pageToken, published, message<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise.&lt;string>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Uploads an image binary to the Facebook page and returns the photo ID.
+The <code>access_token</code> is passed as a URL query parameter — required by the
+Graph API when the body is multipart/form-data.</p>
 </div>
 
 
@@ -488,8 +717,6 @@ subject line and body copy differ slightly between <code>'registration'</code> a
         
 
         
-        <th>Default</th>
-        
 
         <th class="last">Description</th>
     </tr>
@@ -500,7 +727,7 @@ subject line and body copy differ slightly between <code>'registration'</code> a
 
         <tr>
             
-                <td class="name"><code>email</code></td>
+                <td class="name"><code>filePath</code></td>
             
 
             <td class="type">
@@ -523,19 +750,15 @@ subject line and body copy differ slightly between <code>'registration'</code> a
             
 
             
-                <td class="default">
-                
-                </td>
-            
 
-            <td class="description last"><p>The recipient email address.</p></td>
+            <td class="description last"><p>Absolute path to the image file on disk.</p></td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>verificationCode</code></td>
+                <td class="name"><code>mimeType</code></td>
             
 
             <td class="type">
@@ -558,19 +781,108 @@ subject line and body copy differ slightly between <code>'registration'</code> a
             
 
             
-                <td class="default">
-                
-                </td>
-            
 
-            <td class="description last"><p>The 6-digit plain-text code to embed.</p></td>
+            <td class="description last"><p>MIME type of the image (e.g. <code>'image/jpeg'</code>).</p></td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>verification_type</code></td>
+                <td class="name"><code>pageId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Facebook page ID.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>pageToken</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Facebook page access token.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>published</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Whether to publish the photo immediately.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>message</code></td>
             
 
             <td class="type">
@@ -595,15 +907,8 @@ subject line and body copy differ slightly between <code>'registration'</code> a
             
 
             
-                <td class="default">
-                
-                    'registration'
-                
-                </td>
-            
 
-            <td class="description last"><p>Context of the
-verification: <code>'registration'</code> (new account) or <code>'email_change'</code>.</p></td>
+            <td class="description last"><p>Post text to attach (only used when <code>published</code> is true).</p></td>
         </tr>
 
     
@@ -644,7 +949,7 @@ verification: <code>'registration'</code> (new account) or <code>'email_change'<
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line133">line 133</a>
+        <a href="routes_facebookAdmin.js.html">routes/facebookAdmin.js</a>, <a href="routes_facebookAdmin.js.html#line110">line 110</a>
     </li></ul></dd>
     
 
@@ -674,8 +979,7 @@ verification: <code>'registration'</code> (new account) or <code>'email_change'<
 <dl>
     <dt>
         <div class="param-desc">
-        <p>Throws <code>'Failed to send verification email'</code> if nodemailer
-encounters a delivery error.</p>
+        <p>If the Graph API returns an error.</p>
         </div>
     </dt>
     <dd></dd>
@@ -703,7 +1007,7 @@ encounters a delivery error.</p>
 
         
 <div class="param-desc">
-    <p>Resolves with <code>true</code> on successful delivery.</p>
+    <p>The Facebook photo ID.</p>
 </div>
 
 
@@ -714,7 +1018,7 @@ encounters a delivery error.</p>
     </dt>
     <dd>
         
-<span class="param-type">Promise.&lt;true></span>
+<span class="param-type">Promise.&lt;string></span>
 
 
     </dd>
@@ -723,15 +1027,6 @@ encounters a delivery error.</p>
     
 
 
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>await emailService.sendVerificationEmail(
-  'new-user@example.com',
-  '483920',
-  'registration'
-);</code></pre>
 
 
 
