@@ -18,6 +18,7 @@ import express from 'express';
 import { query } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { constructFullUrl } from '../utils/urlHelper.js';
 
 const router = express.Router();
 
@@ -74,7 +75,25 @@ router.get('/', authenticateToken, async (req, res) => {
             )
           ) FILTER (WHERE pv.vote_id IS NOT NULL),
           '[]'::jsonb
-        ) as options
+        ) as options,
+        COALESCE(
+          (
+            SELECT jsonb_agg(voter)
+            FROM (
+              SELECT jsonb_build_object(
+                'name', u.user_name,
+                'imageUrl', u.user_avatar_url
+              ) as voter
+              FROM PollUserVotes puv_r
+              JOIN PollVotes pv_r ON puv_r.vote_id = pv_r.vote_id
+              JOIN Users u ON puv_r.user_id = u.user_id
+              WHERE pv_r.poll_id = p.poll_id
+              ORDER BY u.user_id DESC
+              LIMIT 3
+            ) sub
+          ),
+          '[]'::jsonb
+        ) as recent_voters
       FROM Polls p
       LEFT JOIN PollVotes pv ON p.poll_id = pv.poll_id
       LEFT JOIN PollUserVotes puv ON pv.vote_id = puv.vote_id
@@ -83,7 +102,15 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY p.poll_created_at DESC
     `, [req.userId]);
 
-    res.json({ success: true, polls: result.rows });
+    const polls = result.rows.map((poll) => ({
+      ...poll,
+      recent_voters: (poll.recent_voters ?? []).map((voter) => ({
+        ...voter,
+        imageUrl: constructFullUrl(req, voter.imageUrl),
+      })),
+    }));
+
+    res.json({ success: true, polls });
   } catch (error) {
     logger.error('Error fetching polls', {
       module: 'routes/polls',
@@ -168,6 +195,16 @@ router.get('/results', authenticateToken, async (req, res) => {
           };
         });
 
+        const votersResult = await query(`
+          SELECT u.user_name as name, u.user_avatar_url as "imageUrl"
+          FROM PollUserVotes puv
+          JOIN PollVotes pv ON puv.vote_id = pv.vote_id
+          JOIN Users u ON puv.user_id = u.user_id
+          WHERE pv.poll_id = $1
+          ORDER BY u.user_id DESC
+          LIMIT 3
+        `, [poll.poll_id]);
+
         return {
           poll_id:         poll.poll_id,
           poll_question:   poll.poll_question,
@@ -175,6 +212,10 @@ router.get('/results', authenticateToken, async (req, res) => {
           poll_created_at: poll.poll_created_at,
           total_votes:     totalVotes,
           options,
+          recent_voters: votersResult.rows.map((voter) => ({
+            ...voter,
+            imageUrl: constructFullUrl(req, voter.imageUrl),
+          })),
         };
       }),
     );

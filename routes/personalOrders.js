@@ -46,9 +46,15 @@ const isAdmin = async (userId) => {
 router.get('/', async (req, res) => {
   try {
     const result = await query(`
-      SELECT * FROM PersonalOrders
-      WHERE user_id = $1
-      ORDER BY order_created_at DESC
+      SELECT
+        po.*,
+        pt.product_type_name  AS order_material_type,
+        ac.age_category_name  AS order_material_age_category
+      FROM PersonalOrders po
+      LEFT JOIN ProductTypes   pt ON po.order_material_type_id         = pt.product_type_id
+      LEFT JOIN AgeCategories  ac ON po.order_material_age_category_id = ac.age_category_id
+      WHERE po.user_id = $1
+      ORDER BY po.order_created_at DESC
     `, [req.userId]);
 
     res.json({ success: true, personalOrders: result.rows });
@@ -91,9 +97,13 @@ router.get('/all', async (req, res) => {
       SELECT
         po.*,
         u.user_name,
-        u.user_email
+        u.user_email,
+        pt.product_type_name  AS order_material_type,
+        ac.age_category_name  AS order_material_age_category
       FROM PersonalOrders po
-      JOIN Users u ON po.user_id = u.user_id
+      JOIN Users          u  ON po.user_id                      = u.user_id
+      LEFT JOIN ProductTypes   pt ON po.order_material_type_id         = pt.product_type_id
+      LEFT JOIN AgeCategories  ac ON po.order_material_age_category_id = ac.age_category_id
       ORDER BY po.order_created_at DESC
     `);
 
@@ -134,7 +144,6 @@ router.post('/', async (req, res) => {
     orderTitle,
     orderDescription,
     orderStatus,
-    orderPrice,
     orderMaterialType,
     orderMaterialAgeCategory,
     orderDeadline,
@@ -167,8 +176,8 @@ router.post('/', async (req, res) => {
       req.userId,
       orderTitle,
       orderDescription,
-      orderStatus || 'Нове замовлення',
-      orderPrice  || 0,
+      orderStatus || 'pending',
+      null,
       orderMaterialType,
       orderMaterialAgeCategory,
       orderDeadline || null,
@@ -212,10 +221,16 @@ router.get('/:orderId', async (req, res) => {
   const { orderId } = req.params;
 
   try {
-    const orderResult = await query(
-      'SELECT * FROM PersonalOrders WHERE order_id = $1',
-      [orderId],
-    );
+    const orderResult = await query(`
+      SELECT
+        po.*,
+        pt.product_type_name  AS order_material_type,
+        ac.age_category_name  AS order_material_age_category
+      FROM PersonalOrders po
+      LEFT JOIN ProductTypes   pt ON po.order_material_type_id         = pt.product_type_id
+      LEFT JOIN AgeCategories  ac ON po.order_material_age_category_id = ac.age_category_id
+      WHERE po.order_id = $1
+    `, [orderId]);
 
     if (orderResult.rows.length === 0) {
       return res.status(404).json({
@@ -263,6 +278,7 @@ router.get('/:orderId', async (req, res) => {
  * - `orderTitle`               {string}
  * - `orderDescription`         {string}
  * - `orderStatus`              {string}
+ * - `orderDeclineReason`       {string} Required when `orderStatus` is `'declined'`; must be omitted otherwise.
  * - `orderPrice`               {number}
  * - `orderMaterialType`        {number} — FK to ProductTypes.product_type_id
  * - `orderMaterialAgeCategory` {number} — FK to AgeCategories.age_category_id
@@ -276,6 +292,7 @@ router.put('/:orderId', async (req, res) => {
     orderTitle,
     orderDescription,
     orderStatus,
+    orderDeclineReason,
     orderPrice,
     orderMaterialType,
     orderMaterialAgeCategory,
@@ -304,6 +321,16 @@ router.put('/:orderId', async (req, res) => {
       });
     }
 
+    if (orderStatus === 'declined' && !orderDeclineReason) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          uk: 'При відхиленні замовлення необхідно вказати причину',
+          en: 'A decline reason is required when setting status to declined',
+        },
+      });
+    }
+
     const updates = [];
     const values  = [];
     let   idx     = 1;
@@ -316,6 +343,20 @@ router.put('/:orderId', async (req, res) => {
     if (orderMaterialAgeCategory !== undefined) { updates.push(`order_material_age_category_id = $${idx++}`);   values.push(orderMaterialAgeCategory); }
     if (orderDeadline            !== undefined) { updates.push(`order_deadline = $${idx++}`);                    values.push(orderDeadline); }
 
+    // Keep order_decline_reason consistent with the DB check constraint:
+    // declined → reason required (non-null); any other status → reason must be null.
+    if (orderStatus !== undefined) {
+      if (orderStatus === 'declined') {
+        updates.push(`order_decline_reason = $${idx++}`);
+        values.push(orderDeclineReason);
+      } else {
+        updates.push('order_decline_reason = NULL');
+      }
+    } else if (orderDeclineReason !== undefined) {
+      updates.push(`order_decline_reason = $${idx++}`);
+      values.push(orderDeclineReason);
+    }
+
     if (updates.length === 0) {
       return res.status(400).json({
         success: false,
@@ -324,10 +365,21 @@ router.put('/:orderId', async (req, res) => {
     }
 
     values.push(orderId);
-    const result = await query(
-      `UPDATE PersonalOrders SET ${updates.join(', ')} WHERE order_id = $${idx} RETURNING *`,
+    const updateResult = await query(
+      `UPDATE PersonalOrders SET ${updates.join(', ')} WHERE order_id = $${idx} RETURNING order_id`,
       values,
     );
+
+    const result = await query(`
+      SELECT
+        po.*,
+        pt.product_type_name  AS order_material_type,
+        ac.age_category_name  AS order_material_age_category
+      FROM PersonalOrders po
+      LEFT JOIN ProductTypes   pt ON po.order_material_type_id         = pt.product_type_id
+      LEFT JOIN AgeCategories  ac ON po.order_material_age_category_id = ac.age_category_id
+      WHERE po.order_id = $1
+    `, [updateResult.rows[0].order_id]);
 
     logger.info('Personal order updated', {
       module: 'routes/personalOrders',
