@@ -65,12 +65,15 @@ router.use(requireAdmin);
  * {
  *   "success": true,
  *   "analytics": {
- *     "productId": "5",
- *     "timeFrom": "2026-03-01T00:00:00.000Z",
- *     "timeTo":   "2026-04-01T00:00:00.000Z",
- *     "views":     142,
- *     "purchases": 18,
- *     "saves":     34
+ *     "productId":     5,
+ *     "timeFrom":      "2026-03-01T00:00:00.000Z",
+ *     "timeTo":        "2026-04-01T00:00:00.000Z",
+ *     "views":         142,
+ *     "purchases":     18,
+ *     "saves":         34,
+ *     "averageRating": 4.25,
+ *     "reviewCount":   12,
+ *     "revenue":       1260.00
  *   }
  * }
  * ```
@@ -109,17 +112,19 @@ router.get('/stats/:productId', async (req, res) => {
   }
 
   try {
-    // Verify the product exists first
-    const productCheck = await pool.query(
-      'SELECT product_id FROM Products WHERE product_id = $1',
+    // Fetch product existence + price in one query
+    const productRow = await pool.query(
+      'SELECT product_id, product_price FROM Products WHERE product_id = $1',
       [parsedId],
     );
 
-    if (productCheck.rows.length === 0) {
+    if (productRow.rows.length === 0) {
       return res.status(404).json({ success: false, error: 'Product not found' });
     }
 
-    const [views, purchases, saves] = await Promise.all([
+    const productPrice = parseFloat(productRow.rows[0].product_price);
+
+    const [views, purchases, saves, ratingResult] = await Promise.all([
       pool.query(`
         SELECT COUNT(*) AS count FROM ProductViews
         WHERE product_id = $1
@@ -140,15 +145,30 @@ router.get('/stats/:productId', async (req, res) => {
           AND saved_at >= $2
           AND saved_at <= $3
       `, [parsedId, startDate, endDate]),
+
+      pool.query(`
+        SELECT COALESCE(AVG(r.review_rating), 0) AS avg_rating,
+               COUNT(r.review_id)                AS review_count
+        FROM Reviews r
+        JOIN ProductReviews pr ON r.review_id = pr.review_id
+        WHERE pr.product_id = $1
+          AND pr.review_created_at >= $2
+          AND pr.review_created_at <= $3
+      `, [parsedId, startDate, endDate]),
     ]);
 
+    const purchaseCount = parseInt(purchases.rows[0].count, 10);
+
     const analyticsData = {
-      productId: parsedId,
-      timeFrom:  startDate.toISOString(),
-      timeTo:    endDate.toISOString(),
-      views:     parseInt(views.rows[0].count,     10),
-      purchases: parseInt(purchases.rows[0].count, 10),
-      saves:     parseInt(saves.rows[0].count,     10),
+      productId:     parsedId,
+      timeFrom:      startDate.toISOString(),
+      timeTo:        endDate.toISOString(),
+      views:         parseInt(views.rows[0].count, 10),
+      purchases:     purchaseCount,
+      saves:         parseInt(saves.rows[0].count, 10),
+      averageRating: parseFloat(parseFloat(ratingResult.rows[0].avg_rating).toFixed(2)),
+      reviewCount:   parseInt(ratingResult.rows[0].review_count, 10),
+      revenue:       parseFloat((purchaseCount * productPrice).toFixed(2)),
     };
 
     logger.debug('Analytics stats computed', {
@@ -172,6 +192,43 @@ router.get('/stats/:productId', async (req, res) => {
       error: 'Failed to fetch analytics',
       details: error.message,
     });
+  }
+});
+
+// ── GET /api/analytics/products ──────────────────────────────────────────────
+/**
+ * Returns a lightweight list of ALL products (including hidden/soft-deleted
+ * ones) for the admin analytics product selector.
+ *
+ * **Response shape:**
+ * ```json
+ * { "success": true, "products": [{ "id": 1, "title": "...", "hidden": false }] }
+ * ```
+ */
+router.get('/products', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT product_id    AS id,
+              product_title  AS title,
+              product_hidden AS hidden
+       FROM Products
+       ORDER BY product_id ASC`,
+    );
+
+    logger.debug('Analytics product list fetched', {
+      module: 'routes/analytics',
+      requestId: req.requestId,
+      count: result.rows.length,
+    });
+
+    res.json({ success: true, products: result.rows });
+  } catch (error) {
+    logger.error('Error fetching analytics product list', {
+      module: 'routes/analytics',
+      requestId: req.requestId,
+      error: error.message,
+    });
+    res.status(500).json({ success: false, error: 'Failed to fetch product list' });
   }
 });
 
