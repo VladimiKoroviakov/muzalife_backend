@@ -50,6 +50,7 @@ import clientErrorsRouter from './routes/clientErrors.js';
 import apmRouter from './routes/apm.js';
 import metadataRouter from './routes/metadata.js';
 import facebookAdminRouter from './routes/facebookAdmin.js';
+import paymentsRouter from './routes/payments.js';
 
 
 import { query } from './config/database.js';
@@ -127,6 +128,7 @@ app.use('/api/bought-products', boughtProductsRoutes);
 app.use('/api/errors/client', clientErrorsRouter);
 app.use('/api/apm', apmRouter);
 app.use('/api/admin', facebookAdminRouter);
+app.use('/api/payments', paymentsRouter);
 
 logger.info('All API route modules mounted', { module: 'server' });
 
