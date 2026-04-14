@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Module: utils/logger</title>
+    <title>JSDoc: Module: routes/payments</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Module: utils/logger</h1>
+    <h1 class="page-title">Module: routes/payments</h1>
 
     
 
@@ -38,20 +38,15 @@
     <div class="container-overview">
     
         
-            <div class="description"><p>Centralized Winston-based logging utility for MuzaLife backend.</p>
-<p>Provides a configured logger with multiple transports:</p>
+            <div class="description"><p>Payment routes for MuzaLife — LiqPay integration.</p>
+<p>Exposes three endpoints:</p>
 <ul>
-<li>Console output (colorized, human-readable)</li>
-<li>Combined log file (all levels)</li>
-<li>Error-only log file</li>
-<li>Daily rotating log files (by date, max 14 days retention)</li>
+<li><code>POST /api/payments/product/:productId/initiate</code> — start a catalog product purchase.</li>
+<li><code>POST /api/payments/order/:orderId/initiate</code>    — start a personal order payment.</li>
+<li><code>POST /api/payments/callback</code>                  — LiqPay server-to-server webhook.</li>
 </ul>
-<p><strong>Log level</strong> is controlled at runtime via the <code>LOG_LEVEL</code> environment
-variable — no recompilation required.  Falls back to <code>'info'</code> in
-production and <code>'debug'</code> in development if the variable is not set.</p>
-<p><strong>Log format</strong> (JSON lines in files, colorized text in console):</p>
-<pre class="prettyprint source"><code>{&quot;timestamp&quot;:&quot;…&quot;,&quot;level&quot;:&quot;info&quot;,&quot;module&quot;:&quot;server&quot;,&quot;message&quot;:&quot;…&quot;,&quot;requestId&quot;:&quot;…&quot;}
-</code></pre></div>
+<p>The two initiation endpoints require a valid JWT.  The callback endpoint is
+intentionally public; authenticity is verified via the LiqPay signature.</p></div>
         
 
         
@@ -100,7 +95,7 @@ production and <code>'debug'</code> in development if the variable is not set.</
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line1">line 1</a>
+        <a href="routes_payments.js.html">routes/payments.js</a>, <a href="routes_payments.js.html#line1">line 1</a>
     </li></ul></dd>
     
 
@@ -147,20 +142,178 @@ production and <code>'debug'</code> in development if the variable is not set.</
     
 
     
-        <h3 class="subsection-title">Members</h3>
+
+    
+        <h3 class="subsection-title">Methods</h3>
 
         
             
-<h4 class="name" id="~combinedFileTransport"><span class="type-signature">(inner, constant) </span>combinedFileTransport<span class="type-signature"></span></h4>
 
+    
+
+    
+    <h4 class="name" id="~handleLiqPayResult"><span class="type-signature">(async, inner) </span>handleLiqPayResult<span class="signature">(req, res, root0)</span><span class="type-signature"></span></h4>
+    
+
+    
 
 
 
 <div class="description">
-    <p>Combined file — all messages at or above LOG_LEVEL.
-Not rotated; suitable for short-lived containers or manual archiving.</p>
+    <p>Shared logic for both the POST (auto-redirect) and GET (manual button)
+LiqPay result handlers.  Extracts data + signature from wherever LiqPay
+put them (body for POST, query string for GET), verifies the signature,
+processes the payment, and redirects the browser to the frontend result page.</p>
 </div>
 
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>req</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>res</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>root0</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>signature</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -196,7 +349,7 @@ Not rotated; suitable for short-lived containers or manual archiving.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line91">line 91</a>
+        <a href="routes_payments.js.html">routes/payments.js</a>, <a href="routes_payments.js.html#line419">line 419</a>
     </li></ul></dd>
     
 
@@ -212,17 +365,115 @@ Not rotated; suitable for short-lived containers or manual archiving.</p>
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         
             
-<h4 class="name" id="~consoleFormat"><span class="type-signature">(inner, constant) </span>consoleFormat<span class="type-signature"></span></h4>
 
+    
+
+    
+    <h4 class="name" id="~processVerifiedPayload"><span class="type-signature">(async, inner) </span>processVerifiedPayload<span class="signature">(payload, requestId)</span><span class="type-signature"> &rarr; {Promise.&lt;boolean>}</span></h4>
+    
+
+    
 
 
 
 <div class="description">
-    <p>Human-readable colorized format for the console.</p>
+    <p>Processes a decoded, signature-verified LiqPay payload and updates the DB.</p>
 </div>
 
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>payload</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Decoded LiqPay JSON payload.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>requestId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Request ID for logging.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
 
 
 
@@ -258,7 +509,7 @@ Not rotated; suitable for short-lived containers or manual archiving.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line64">line 64</a>
+        <a href="routes_payments.js.html">routes/payments.js</a>, <a href="routes_payments.js.html#line370">line 370</a>
     </li></ul></dd>
     
 
@@ -274,270 +525,44 @@ Not rotated; suitable for short-lived containers or manual archiving.</p>
 
 
 
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
         
-            
-<h4 class="name" id="~consoleTransport"><span class="type-signature">(inner, constant) </span>consoleTransport<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Console transport — always active.
-In production the level is capped at 'info' unless LOG_LEVEL overrides it.</p>
+<div class="param-desc">
+    <p><code>true</code> if a DB record was written, <code>false</code> if the
+order_id format was unrecognised (not an error — just skip).</p>
 </div>
 
 
 
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;boolean></span>
 
 
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line82">line 82</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
+    </dd>
 </dl>
 
+    
 
 
 
 
 
         
-            
-<h4 class="name" id="~dailyRotateTransport"><span class="type-signature">(inner, constant) </span>dailyRotateTransport<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Daily rotating transport — one file per day, retained for 14 days.
-Filenames: logs/muzalife-YYYY-MM-DD.log
-Compression: gzip on rotation.</p>
-<p>Log rotation strategy:</p>
-<ul>
-<li>By time: new file every day at midnight UTC</li>
-<li>By size: if a single day's file exceeds 20 MB it is rotated mid-day</li>
-<li>Retention: files older than 14 days are deleted automatically</li>
-</ul>
-<p>In containerised deployments (Docker) log rotation is typically handled by
-the container runtime (e.g. Docker's <code>--log-opt max-size</code>).  This in-process
-rotation provides an additional safety net for bare-metal or VM deployments.</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line127">line 127</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="~errorFileTransport"><span class="type-signature">(inner, constant) </span>errorFileTransport<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Error-only file — only 'error' level messages.
-Allows quick inspection of failures without grepping.</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line104">line 104</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-            
-<h4 class="name" id="~fileFormat"><span class="type-signature">(inner, constant) </span>fileFormat<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>JSON format used for log files — machine-parseable.</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_logger.js.html">utils/logger.js</a>, <a href="utils_logger.js.html#line56">line 56</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-    
-
     
 
     

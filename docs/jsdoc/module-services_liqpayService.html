@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: AppError</title>
+    <title>JSDoc: Module: services/liqpayService</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: AppError</h1>
+    <h1 class="page-title">Module: services/liqpayService</h1>
 
     
 
@@ -28,10 +28,8 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>
-            <span class="ancestors"><a href="module-utils_AppError.html">utils/AppError</a>.</span>AppError<span class="signature">(message, statusCode, errorCode, context<span class="signature-attributes">opt</span>, isOperational<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description"><p>Base class for all application-level errors.</p></div>
+            
         
     
 </header>
@@ -40,18 +38,129 @@
     <div class="container-overview">
     
         
+            <div class="description"><p>LiqPay payment processing service for MuzaLife.</p>
+<p>Provides utilities to create signed LiqPay payment payloads and to verify
+the authenticity of incoming LiqPay webhook callbacks.</p>
+<p><strong>LiqPay signature algorithm:</strong>
+<code>base64( sha1( private_key + base64_data + private_key ) )</code></p>
+<p>Sandbox mode is enabled automatically when <code>NODE_ENV</code> is not <code>'production'</code>.</p></div>
+        
+
+        
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
 
     
-    <h2>Constructor</h2>
-    
 
-    
-    <h4 class="name" id="AppError"><span class="type-signature"></span>new AppError<span class="signature">(message, statusCode, errorCode, context<span class="signature-attributes">opt</span>, isOperational<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
     
 
     
 
+    
 
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="services_liqpayService.js.html">services/liqpayService.js</a>, <a href="services_liqpayService.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".createPaymentData"><span class="type-signature">(static) </span>createPaymentData<span class="signature">(params)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Creates a signed LiqPay payment payload to be forwarded to the frontend.</p>
+<p>The frontend uses the returned <code>data</code> and <code>signature</code> to render a LiqPay
+checkout button or to redirect the user to LiqPay's hosted payment page.</p>
+</div>
 
 
 
@@ -74,11 +183,7 @@
         <th>Type</th>
 
         
-        <th>Attributes</th>
-        
 
-        
-        <th>Default</th>
         
 
         <th class="last">Description</th>
@@ -90,112 +195,7 @@
 
         <tr>
             
-                <td class="name"><code>message</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last"><p>Developer-facing error description.</p></td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>statusCode</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">number</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last"><p>HTTP status code to send.</p></td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>errorCode</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">string</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last"><p>Machine-readable code (e.g. 'USER_NOT_FOUND').</p></td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>context</code></td>
+                <td class="name"><code>params</code></td>
             
 
             <td class="type">
@@ -208,10 +208,52 @@
             </td>
 
             
+
+            
+
+            <td class="description last"><p>Payment parameters.</p>
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>orderId</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
                 <td class="attributes">
                 
-                    &lt;optional><br>
-                
 
                 
 
@@ -220,25 +262,55 @@
             
 
             
-                <td class="default">
-                
-                </td>
-            
 
-            <td class="description last"><p>Extra diagnostic data (params, state, userId…).</p></td>
+            <td class="description last"><p>Unique internal order identifier.</p></td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>isOperational</code></td>
+                <td class="name"><code>amount</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type">boolean</span>
+<span class="param-type">number</span>
+|
+
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"><p>Payment amount (UAH).</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>currency</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
 
 
             
@@ -257,14 +329,46 @@
             
 
             
-                <td class="default">
+
+            <td class="description last"><p>ISO 4217 currency code.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>description</code></td>
+            
+
+            <td class="type">
+            
                 
-                    true
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
                 
                 </td>
             
 
-            <td class="description last"><p><code>true</code> for expected errors, <code>false</code> for bugs.</p></td>
+            
+
+            <td class="description last"><p>Human-readable payment description.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
         </tr>
 
     
@@ -305,193 +409,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_AppError.js.html">utils/AppError.js</a>, <a href="utils_AppError.js.html#line29">line 29</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    
-    </div>
-
-    
-        <h3 class="subsection-title">Extends</h3>
-
-        
-
-
-    <ul>
-        <li>Error</li>
-    </ul>
-
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-        <h3 class="subsection-title">Members</h3>
-
-        
-            
-<h4 class="name" id="errorId"><span class="type-signature"></span>errorId<span class="type-signature"></span></h4>
-
-
-
-
-<div class="description">
-    <p>Unique ID for this error instance — embed in logs and API responses.</p>
-</div>
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_AppError.js.html">utils/AppError.js</a>, <a href="utils_AppError.js.html#line46">line 46</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-        
-    
-
-    
-        <h3 class="subsection-title">Methods</h3>
-
-        
-            
-
-    
-
-    
-    <h4 class="name" id="toJSON"><span class="type-signature"></span>toJSON<span class="signature">()</span><span class="type-signature"> &rarr; {object}</span></h4>
-    
-
-    
-
-
-
-<div class="description">
-    <p>Serialises the error to a plain object suitable for JSON API responses.
-Sensitive fields (stack trace, internal context) are excluded.</p>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_AppError.js.html">utils/AppError.js</a>, <a href="utils_AppError.js.html#line61">line 61</a>
+        <a href="services_liqpayService.js.html">services/liqpayService.js</a>, <a href="services_liqpayService.js.html#line55">line 55</a>
     </li></ul></dd>
     
 
@@ -519,6 +437,10 @@ Sensitive fields (stack trace, internal context) are excluded.</p>
 <h5>Returns:</h5>
 
         
+<div class="param-desc">
+    <p>Signed LiqPay payload.</p>
+</div>
+
 
 
 <dl>
@@ -527,7 +449,366 @@ Sensitive fields (stack trace, internal context) are excluded.</p>
     </dt>
     <dd>
         
-<span class="param-type">object</span>
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>const { data, signature } = createPaymentData({
+  orderId: 'product_42_7_1714000000000',
+  amount: 199.99,
+  description: 'Сценарій — Романтичний вечір',
+});</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id=".verifyCallback"><span class="type-signature">(static) </span>verifyCallback<span class="signature">(data, signature)</span><span class="type-signature"> &rarr; {boolean}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Verifies that a LiqPay webhook callback was genuinely sent by LiqPay.</p>
+<p>Recomputes the expected signature from the private key and data, then
+compares it against the provided signature using strict equality.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Base64-encoded payload received in the callback.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>signature</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Signature received in the callback.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="services_liqpayService.js.html">services/liqpayService.js</a>, <a href="services_liqpayService.js.html#line88">line 88</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p><code>true</code> if the signature is valid, <code>false</code> otherwise.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">boolean</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>if (!verifyCallback(req.body.data, req.body.signature)) {
+  return res.status(400).json({ error: 'Invalid signature' });
+}</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="~sign"><span class="type-signature">(inner) </span>sign<span class="signature">(data)</span><span class="type-signature"> &rarr; {string}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Computes the LiqPay signature for a given base64-encoded data string.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>data</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Base64-encoded JSON payload.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="services_liqpayService.js.html">services/liqpayService.js</a>, <a href="services_liqpayService.js.html#line31">line 31</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Base64-encoded SHA1 signature.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">string</span>
 
 
     </dd>
