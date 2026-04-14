@@ -1,5 +1,5 @@
 /**
- * @fileoverview SMTP email delivery service for MuzaLife.
+ * @file SMTP email delivery service for MuzaLife.
  *
  * Wraps `nodemailer` to send transactional emails (currently only email
  * verification messages).  SMTP credentials and server settings are loaded
@@ -9,7 +9,6 @@
  * startup (singleton via module-level instantiation) and reused for every
  * send operation.  This keeps the TCP connection warm and avoids the overhead
  * of re-authenticating for every email.
- *
  * @module services/emailService
  */
 
@@ -39,10 +38,8 @@ class EmailService {
    * Reads SMTP settings from environment variables with sensible defaults.
    * After creation, calls `transporter.verify()` to assert connectivity and
    * logs the result.
-   *
-   * @returns {Object|undefined} The nodemailer
+   * @returns {object | undefined} The nodemailer
    *   transporter, or `undefined` if creation fails.
-   *
    * @example
    * // Called automatically by the constructor — not meant for external use.
    */
@@ -94,11 +91,9 @@ class EmailService {
    *
    * **Algorithm:** searches for the first occurrence of `>NNNNNN<` where
    * `N` is a digit (matches the code rendered inside an HTML tag).
-   *
    * @param {string} html - Raw HTML string of the email body.
    * @returns {string} The 6-digit code, or `'Not found in HTML'` if the
    *   pattern is absent.
-   *
    * @example
    * const code = emailService.extractVerificationCode('<h3>483920</h3>');
    * console.log(code); // '483920'
@@ -114,15 +109,13 @@ class EmailService {
    * The email is bilingual-ready but currently rendered in Ukrainian.  The
    * subject line and body copy differ slightly between `'registration'` and
    * `'email_change'` flows.
-   *
    * @param {string} email             - The recipient email address.
    * @param {string} verificationCode  - The 6-digit plain-text code to embed.
-   * @param {string} [verification_type='registration'] - Context of the
+   * @param {string} [verification_type] - Context of the
    *   verification: `'registration'` (new account) or `'email_change'`.
    * @returns {Promise<true>} Resolves with `true` on successful delivery.
    * @throws {Error} Throws `'Failed to send verification email'` if nodemailer
    *   encounters a delivery error.
-   *
    * @example
    * await emailService.sendVerificationEmail(
    *   'new-user@example.com',
@@ -181,12 +174,77 @@ class EmailService {
       throw new Error('Failed to send verification email');
     }
   }
+
+  /**
+   * Sends a purchase confirmation email to a guest shopper.
+   *
+   * Called after a successful LiqPay payment for a guest (unauthenticated)
+   * cart checkout.  Informs the guest that their materials will be delivered
+   * to the verified email address.
+   * @param {string}   email        - The verified guest email address.
+   * @param {string[]} productNames - Titles of the purchased products.
+   * @returns {Promise<true>} Resolves with `true` on successful delivery.
+   * @throws {Error} Throws if nodemailer encounters a delivery error.
+   * @example
+   * await emailService.sendGuestPurchaseConfirmation(
+   *   'guest@example.com',
+   *   ['Сценарій для дня народження', 'Квест для дітей']
+   * );
+   */
+  async sendGuestPurchaseConfirmation(email, productNames) {
+    try {
+      const productList = productNames
+        .map((name) => `<li style="margin-bottom:8px;">${name}</li>`)
+        .join('');
+
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || '"Muza Life" <noreply@muzalife.com>',
+        to: email,
+        subject: 'Дякуємо за покупку! — Muza Life',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #5e89e8;">Muza Life</h1>
+            </div>
+
+            <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px;">
+              <h2 style="color: #333; margin-bottom: 16px;">Дякуємо за покупку!</h2>
+              <p style="color: #666; font-size: 16px; margin-bottom: 20px;">
+                Ваше замовлення успішно оплачено. Придбані матеріали будуть надіслані на цю електронну адресу найближчим часом.
+              </p>
+
+              <h3 style="color: #333; margin-bottom: 12px;">Придбані матеріали:</h3>
+              <ul style="color: #444; font-size: 15px; padding-left: 20px;">
+                ${productList}
+              </ul>
+
+              <p style="color: #999; font-size: 13px; margin-top: 24px;">
+                Якщо у вас виникли питання, зверніться до нашої підтримки.
+              </p>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+              <p style="color: #999; font-size: 12px;">
+                &copy; ${new Date().getFullYear()} Muza Life. Всі права захищені.
+              </p>
+            </div>
+          </div>
+        `,
+        text: `Дякуємо за покупку!\n\nПридбані матеріали:\n${productNames.map((n) => `- ${n}`).join('\n')}\n\nМатеріали будуть надіслані на цю електронну пошту найближчим часом.\n\n© ${new Date().getFullYear()} Muza Life`,
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      return true;
+    } catch (error) {
+      console.error('❌ Error sending guest purchase confirmation:', error.message);
+      throw new Error('Failed to send guest purchase confirmation email');
+    }
+  }
 }
 
 /**
  * Singleton instance of {@link EmailService}.
  * Import this throughout the application — do not construct a new instance.
- *
  * @type {EmailService}
  */
 export const emailService = new EmailService();

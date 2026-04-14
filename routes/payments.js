@@ -13,9 +13,10 @@
 
 import { Router } from 'express';
 import { query } from '../config/database.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, authenticateAnyToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 import { createPaymentData, verifyCallback } from '../services/liqpayService.js';
+import { emailService } from '../services/emailService.js';
 import {
   NotFoundError,
   ConflictError,
@@ -173,12 +174,15 @@ router.post('/order/:orderId/initiate', authenticateToken, async (req, res, next
 /**
  * Initiates a single LiqPay payment for multiple catalog products (cart checkout).
  *
- * Validates that every product exists, is not hidden, and has not already been
- * purchased by the authenticated user.  The total amount is the sum of all
- * product prices.  The internal order ID encodes the product IDs so the
- * callback handler can fulfil all of them on success.
+ * Accepts both authenticated users and verified guest shoppers.
  *
- * **Auth:** authenticated user
+ * For **authenticated users** the order_id is:
+ *   `cart_${ids.join('-')}_${userId}_${timestamp}`
+ *
+ * For **guests** the order_id is:
+ *   `cart_${ids.join('-')}_guest_${base64url(email)}_${timestamp}`
+ *
+ * **Auth:** regular user JWT **or** short-lived guest JWT
  *
  * **Body:** `{ productIds: number[] }`
  *
@@ -190,11 +194,12 @@ router.post('/order/:orderId/initiate', authenticateToken, async (req, res, next
  * @returns {object} 200 - Signed LiqPay payment payload.
  * @throws {ValidationError} 400 - `productIds` is missing, empty, or invalid.
  * @throws {NotFoundError}   404 - One or more products not found or hidden.
- * @throws {ConflictError}   409 - One or more products already purchased.
+ * @throws {ConflictError}   409 - One or more products already purchased (authenticated users only).
  */
-router.post('/cart/initiate', authenticateToken, async (req, res, next) => {
+router.post('/cart/initiate', authenticateAnyToken, async (req, res, next) => {
   try {
-    const userId = req.userId;
+    const userId = req.userId;           // set for authenticated users
+    const guestEmail = req.guestEmail;   // set for guest users
     const { productIds } = req.body;
 
     if (
@@ -222,17 +227,19 @@ router.post('/cart/initiate', authenticateToken, async (req, res, next) => {
       throw new NotFoundError('One or more products not found or hidden', { missingIds });
     }
 
-    // Check for already-purchased products
-    const boughtResult = await query(
-      `SELECT product_id
-         FROM BoughtUserProducts
-        WHERE user_id = $1 AND product_id = ANY($2::int[])`,
-      [userId, ids],
-    );
+    // Check for already-purchased products (authenticated users only)
+    if (userId) {
+      const boughtResult = await query(
+        `SELECT product_id
+           FROM BoughtUserProducts
+          WHERE user_id = $1 AND product_id = ANY($2::int[])`,
+        [userId, ids],
+      );
 
-    if (boughtResult.rows.length > 0) {
-      const alreadyBoughtIds = boughtResult.rows.map((r) => r.product_id);
-      throw new ConflictError('One or more products already purchased', { alreadyBoughtIds });
+      if (boughtResult.rows.length > 0) {
+        const alreadyBoughtIds = boughtResult.rows.map((r) => r.product_id);
+        throw new ConflictError('One or more products already purchased', { alreadyBoughtIds });
+      }
     }
 
     const totalAmount = productsResult.rows.reduce(
@@ -245,9 +252,16 @@ router.post('/cart/initiate', authenticateToken, async (req, res, next) => {
         ? productsResult.rows[0].product_title
         : `Покупка ${ids.length} матеріалів`;
 
-    // Encode product IDs joined by '-', separated from userId and timestamp by '_'
-    // e.g. cart_1-2-3_42_1714000000000
-    const orderId = `cart_${ids.join('-')}_${userId}_${Date.now()}`;
+    // Build order_id:
+    //   authenticated: cart_1-2-3_42_1714000000000
+    //   guest:         cart_1-2-3_guest_<base64url(email)>_1714000000000
+    let orderId;
+    if (guestEmail) {
+      const encodedEmail = Buffer.from(guestEmail).toString('base64url');
+      orderId = `cart_${ids.join('-')}_guest_${encodedEmail}_${Date.now()}`;
+    } else {
+      orderId = `cart_${ids.join('-')}_${userId}_${Date.now()}`;
+    }
 
     const paymentData = createPaymentData({
       orderId,
@@ -258,7 +272,8 @@ router.post('/cart/initiate', authenticateToken, async (req, res, next) => {
 
     logger.info('Cart payment initiated', {
       requestId: req.requestId,
-      userId,
+      userId: userId ?? null,
+      guestEmail: guestEmail ?? null,
       productIds: ids,
       totalAmount,
       orderId,
@@ -275,21 +290,20 @@ router.post('/cart/initiate', authenticateToken, async (req, res, next) => {
  * Fallback purchase-confirmation endpoint for environments where LiqPay's
  * servers cannot reach the backend (e.g. localhost development).
  *
- * The frontend stores the LiqPay `order_id` in localStorage before redirecting
- * to checkout, then calls this endpoint after the user returns.  The order_id
- * encodes the authenticated user's ID so we can verify ownership without
- * calling LiqPay's status API.  All writes are idempotent.
+ * Accepts both regular user JWTs and short-lived guest JWTs so that both
+ * checkout paths can fall back to this endpoint in development.
  *
- * **Auth:** authenticated user (JWT required)
+ * **Auth:** regular user JWT **or** short-lived guest JWT
  *
  * **Body:** `{ orderId: string }`
  * @returns {object} 200 - `{ success: true }` — purchase recorded (or already existed).
  * @throws {ValidationError} 400 - `orderId` missing or in unrecognised format.
  * @throws {ForbiddenError}  403 - `orderId` encodes a different user's ID.
  */
-router.post('/verify', authenticateToken, async (req, res, next) => {
+router.post('/verify', authenticateAnyToken, async (req, res, next) => {
   try {
     const userId = req.userId;
+    const guestEmail = req.guestEmail;
     const { orderId } = req.body;
 
     if (!orderId || typeof orderId !== 'string') {
@@ -313,23 +327,45 @@ router.post('/verify', authenticateToken, async (req, res, next) => {
 
       logger.info('Product purchase verified and recorded', { requestId: req.requestId, userId, productId, orderId });
     } else if (orderId.startsWith('cart_')) {
-      // Format: cart_{productIds joined by '-'}_{userId}_{timestamp}
+      // Detect guest cart order: cart_{ids}_guest_{base64email}_{timestamp}
       const parts = orderId.split('_');
       const productIds = parts[1].split('-').map(Number);
-      const orderUserId = Number(parts[2]);
+      const isGuest = parts[2] === 'guest';
 
-      if (orderUserId !== userId) {
-        throw new ForbiddenError('Order does not belong to this user', { orderId, userId });
+      if (isGuest) {
+        if (!guestEmail) {
+          throw new ForbiddenError('Guest token required for guest order', { orderId });
+        }
+        // Decode email from order_id and verify it matches the token
+        const encodedEmail = parts[3];
+        const orderEmail = Buffer.from(encodedEmail, 'base64url').toString();
+        if (orderEmail !== guestEmail) {
+          throw new ForbiddenError('Guest order does not belong to this guest', { orderId });
+        }
+        for (const productId of productIds) {
+          await query(
+            'INSERT INTO GuestPurchases (guest_email, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+            [guestEmail, productId, orderId],
+          );
+        }
+        logger.info('Guest cart purchase verified and recorded', { requestId: req.requestId, guestEmail, productIds, orderId });
+      } else {
+        // Format: cart_{productIds joined by '-'}_{userId}_{timestamp}
+        const orderUserId = Number(parts[2]);
+
+        if (orderUserId !== userId) {
+          throw new ForbiddenError('Order does not belong to this user', { orderId, userId });
+        }
+
+        for (const productId of productIds) {
+          await query(
+            'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [userId, productId],
+          );
+        }
+
+        logger.info('Cart purchase verified and recorded', { requestId: req.requestId, userId, productIds, orderId });
       }
-
-      for (const productId of productIds) {
-        await query(
-          'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [userId, productId],
-        );
-      }
-
-      logger.info('Cart purchase verified and recorded', { requestId: req.requestId, userId, productIds, orderId });
     } else if (orderId.startsWith('personalorder_')) {
       // Format: personalorder_{orderId}
       const personalOrderId = Number(orderId.replace('personalorder_', ''));
@@ -382,14 +418,40 @@ async function processVerifiedPayload(payload, requestId) {
   } else if (liqpayOrderId.startsWith('cart_')) {
     const parts = liqpayOrderId.split('_');
     const productIds = parts[1].split('-').map(Number);
-    const userId = Number(parts[2]);
-    for (const productId of productIds) {
-      await query(
-        'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [userId, productId],
-      );
+    const isGuest = parts[2] === 'guest';
+
+    if (isGuest) {
+      // Guest cart: cart_{ids}_guest_{base64url(email)}_{timestamp}
+      const guestEmail = Buffer.from(parts[3], 'base64url').toString();
+      for (const productId of productIds) {
+        await query(
+          'INSERT INTO GuestPurchases (guest_email, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+          [guestEmail, productId, liqpayOrderId],
+        );
+      }
+      // Notify guest that materials will arrive by email
+      try {
+        const productsResult = await query(
+          'SELECT product_title FROM Products WHERE product_id = ANY($1::int[])',
+          [productIds],
+        );
+        const productNames = productsResult.rows.map((r) => r.product_title);
+        await emailService.sendGuestPurchaseConfirmation(guestEmail, productNames);
+      } catch (emailErr) {
+        logger.warn('Could not send guest purchase confirmation email', { requestId, guestEmail, error: emailErr.message });
+      }
+      logger.info('Guest cart purchase recorded', { requestId, productIds, guestEmail, liqpayOrderId });
+    } else {
+      // Authenticated user cart: cart_{ids}_{userId}_{timestamp}
+      const userId = Number(parts[2]);
+      for (const productId of productIds) {
+        await query(
+          'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [userId, productId],
+        );
+      }
+      logger.info('Cart purchase recorded', { requestId, productIds, userId, liqpayOrderId });
     }
-    logger.info('Cart purchase recorded', { requestId, productIds, userId, liqpayOrderId });
   } else if (liqpayOrderId.startsWith('personalorder_')) {
     const orderId = Number(liqpayOrderId.replace('personalorder_', ''));
     await query(

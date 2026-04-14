@@ -228,6 +228,17 @@ const setupDatabase = async () => {
             FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
         );
 
+        -- GuestPurchases — records purchases made by unregistered guest shoppers
+        CREATE TABLE GuestPurchases (
+            id SERIAL PRIMARY KEY,
+            guest_email VARCHAR(255) NOT NULL,
+            product_id INTEGER NOT NULL,
+            order_id VARCHAR(500) NOT NULL,
+            bought_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE,
+            UNIQUE (guest_email, product_id, order_id)
+        );
+
         -- ProductEvents (junction table between Products and Events)
         CREATE TABLE ProductEvents (
             product_id INTEGER,
@@ -308,6 +319,8 @@ const setupDatabase = async () => {
         -- Junction table indexes
         CREATE INDEX idx_saved_user_products_user_id ON SavedUserProducts(user_id);
         CREATE INDEX idx_bought_user_products_user_id ON BoughtUserProducts(user_id);
+        CREATE INDEX idx_guest_purchases_email ON GuestPurchases(guest_email);
+        CREATE INDEX idx_guest_purchases_order_id ON GuestPurchases(order_id);
         CREATE INDEX idx_product_events_product_id ON ProductEvents(product_id);
         CREATE INDEX idx_product_age_categories_product_id ON ProductAgeCategories(product_id);
         CREATE INDEX idx_product_images_product_id ON ProductImages(product_id);

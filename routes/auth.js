@@ -7,6 +7,11 @@ import {
   googleAuth,
   facebookAuth
 } from '../controllers/authController.js';
+import {
+  initiateGuestVerification,
+  confirmGuestEmail,
+  resendGuestVerification,
+} from '../controllers/guestController.js';
 
 const router = express.Router();
 
@@ -19,5 +24,10 @@ router.post('/register/resend-code', resendVerificationCode);
 router.post('/login', login);
 router.post('/google', googleAuth);
 router.post('/facebook', facebookAuth);
+
+// Guest checkout email verification (no account created)
+router.post('/guest/verify/initiate', initiateGuestVerification);
+router.post('/guest/verify/confirm', confirmGuestEmail);
+router.post('/guest/verify/resend', resendGuestVerification);
 
 export default router;
