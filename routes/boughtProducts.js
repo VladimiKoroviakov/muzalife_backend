@@ -1,6 +1,9 @@
 import express from 'express';
 import { query } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { emailService } from '../services/emailService.js';
+import logger from '../utils/logger.js';
+import { NotFoundError } from '../utils/AppError.js';
 
 const router = express.Router();
 
@@ -102,6 +105,72 @@ router.post('/', authenticateToken, async (req, res) => {
       success: false,
       error: 'Failed to record purchase'
     });
+  }
+});
+
+// ── POST /api/bought-products/:productId/send-materials ──────────────────────
+/**
+ * Re-sends purchased product material download links to the authenticated user.
+ *
+ * Verifies that the user owns the purchase, fetches the product's attached
+ * files, and emails download links to the user's registered email address.
+ *
+ * **Auth:** authenticated user (must own the purchase)
+ * @param {string} req.params.productId - ID of the purchased product.
+ * @returns {object} 200 - `{ success: true, message: { uk, en } }`
+ * @throws {NotFoundError} 404 - Product not purchased or has no files.
+ */
+router.post('/:productId/send-materials', authenticateToken, async (req, res, next) => {
+  try {
+    const userId = req.userId;
+    const productId = Number(req.params.productId);
+
+    if (!Number.isInteger(productId) || productId <= 0) {
+      throw new NotFoundError('Product not found', { productId: req.params.productId });
+    }
+
+    // Verify ownership and fetch product title + user email in one query
+    const purchaseResult = await query(
+      `SELECT p.product_title, u.user_email
+         FROM BoughtUserProducts bup
+         JOIN Products p ON p.product_id = bup.product_id
+         JOIN Users u ON u.user_id = bup.user_id
+        WHERE bup.user_id = $1 AND bup.product_id = $2`,
+      [userId, productId],
+    );
+
+    if (!purchaseResult.rows.length) {
+      throw new NotFoundError('Product not purchased', { productId, userId });
+    }
+
+    const { product_title, user_email } = purchaseResult.rows[0];
+
+    const filesResult = await query(
+      `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+         FROM Files f
+         JOIN ProductFiles pf ON pf.file_id = f.file_id
+        WHERE pf.product_id = $1
+        ORDER BY f.file_id`,
+      [productId],
+    );
+
+    if (!filesResult.rows.length) {
+      throw new NotFoundError('No materials found for this product', { productId });
+    }
+
+    await emailService.sendProductMaterials(user_email, product_title, filesResult.rows);
+
+    logger.info('Product materials re-sent', { requestId: req.requestId, userId, productId });
+
+    res.json({
+      success: true,
+      message: {
+        uk: 'Матеріали надіслано на вашу електронну пошту',
+        en: 'Materials sent to your email',
+      },
+    });
+  } catch (err) {
+    next(err);
   }
 });
 

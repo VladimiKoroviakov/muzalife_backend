@@ -101,7 +101,7 @@ router.post('/product/:productId/initiate', authenticateToken, async (req, res, 
  * Initiates a LiqPay payment for a personal order.
  *
  * The order must belong to the authenticated user, have status
- * `'Очікує оплату'`, and carry a positive price set by an admin.
+ * `'accepted'`, and carry a positive price set by an admin.
  *
  * **Auth:** authenticated user (order owner)
  *
@@ -137,7 +137,7 @@ router.post('/order/:orderId/initiate', authenticateToken, async (req, res, next
       throw new ForbiddenError('Not authorized to pay for this order', { orderId, userId });
     }
 
-    if (order.order_status !== 'Очікує оплату') {
+    if (order.order_status !== 'accepted') {
       throw new ValidationError('Order is not awaiting payment', {
         orderId,
         currentStatus: order.order_status,
@@ -342,13 +342,59 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
         if (orderEmail !== guestEmail) {
           throw new ForbiddenError('Guest order does not belong to this guest', { orderId });
         }
+
+        // RETURNING lets us detect whether each row is new — used to guard email
+        // sends so the server-to-server callback (if it already fired) doesn't
+        // result in duplicate delivery.
+        let newRows = 0;
         for (const productId of productIds) {
-          await query(
-            'INSERT INTO GuestPurchases (guest_email, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+          const result = await query(
+            'INSERT INTO GuestPurchases (guest_email, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING product_id',
             [guestEmail, productId, orderId],
           );
+          newRows += result.rows.length;
         }
         logger.info('Guest cart purchase verified and recorded', { requestId: req.requestId, guestEmail, productIds, orderId });
+
+        // Send confirmation + materials only when at least one row was newly inserted.
+        // If newRows === 0 the server-to-server callback already processed this order.
+        if (newRows > 0) {
+          try {
+            const [productsResult, filesResult] = await Promise.all([
+              query(
+                'SELECT product_id, product_title FROM Products WHERE product_id = ANY($1::int[])',
+                [productIds],
+              ),
+              query(
+                `SELECT pf.product_id AS "productId", f.file_name AS "fileName", f.file_url AS "fileUrl"
+                   FROM Files f
+                   JOIN ProductFiles pf ON pf.file_id = f.file_id
+                  WHERE pf.product_id = ANY($1::int[])
+                  ORDER BY pf.product_id, f.file_id`,
+                [productIds],
+              ),
+            ]);
+
+            const productNames = productsResult.rows.map((r) => r.product_title);
+            await emailService.sendGuestPurchaseConfirmation(guestEmail, productNames);
+
+            const filesByProduct = {};
+            for (const row of filesResult.rows) {
+              if (!filesByProduct[row.productId]) { filesByProduct[row.productId] = []; }
+              filesByProduct[row.productId].push({ fileName: row.fileName, fileUrl: row.fileUrl });
+            }
+            for (const product of productsResult.rows) {
+              const files = filesByProduct[product.product_id];
+              if (files?.length) {
+                await emailService.sendProductMaterials(guestEmail, product.product_title, files);
+              }
+            }
+          } catch (emailErr) {
+            logger.warn('Could not send guest purchase emails (verify fallback)', {
+              requestId: req.requestId, guestEmail, productIds, error: emailErr.message,
+            });
+          }
+        }
       } else {
         // Format: cart_{productIds joined by '-'}_{userId}_{timestamp}
         const orderUserId = Number(parts[2]);
@@ -381,7 +427,7 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
 
       await query(
         'UPDATE PersonalOrders SET order_status = $1 WHERE order_id = $2',
-        ['Оплачено', personalOrderId],
+        ['paid', personalOrderId],
       );
 
       logger.info('Personal order verified and marked paid', { requestId: req.requestId, userId, personalOrderId, orderId });
@@ -415,6 +461,34 @@ async function processVerifiedPayload(payload, requestId) {
       [userId, productId],
     );
     logger.info('Product purchase recorded', { requestId, productId, userId, liqpayOrderId });
+
+    // Auto-send product materials to the authenticated user
+    try {
+      const [userResult, productTitleResult, filesResult] = await Promise.all([
+        query('SELECT user_email FROM Users WHERE user_id = $1', [userId]),
+        query('SELECT product_title FROM Products WHERE product_id = $1', [productId]),
+        query(
+          `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+             FROM Files f
+             JOIN ProductFiles pf ON pf.file_id = f.file_id
+            WHERE pf.product_id = $1
+            ORDER BY f.file_id`,
+          [productId],
+        ),
+      ]);
+      const userEmail = userResult.rows[0]?.user_email;
+      if (userEmail && filesResult.rows.length > 0) {
+        await emailService.sendProductMaterials(
+          userEmail,
+          productTitleResult.rows[0]?.product_title ?? '',
+          filesResult.rows,
+        );
+      }
+    } catch (emailErr) {
+      logger.warn('Could not send product materials email', {
+        requestId, userId, productId, error: emailErr.message,
+      });
+    }
   } else if (liqpayOrderId.startsWith('cart_')) {
     const parts = liqpayOrderId.split('_');
     const productIds = parts[1].split('-').map(Number);
@@ -429,10 +503,11 @@ async function processVerifiedPayload(payload, requestId) {
           [guestEmail, productId, liqpayOrderId],
         );
       }
-      // Notify guest that materials will arrive by email
+      // Notify guest that purchase is confirmed, then send material download links
+      let productsResult;
       try {
-        const productsResult = await query(
-          'SELECT product_title FROM Products WHERE product_id = ANY($1::int[])',
+        productsResult = await query(
+          'SELECT product_id, product_title FROM Products WHERE product_id = ANY($1::int[])',
           [productIds],
         );
         const productNames = productsResult.rows.map((r) => r.product_title);
@@ -440,6 +515,32 @@ async function processVerifiedPayload(payload, requestId) {
       } catch (emailErr) {
         logger.warn('Could not send guest purchase confirmation email', { requestId, guestEmail, error: emailErr.message });
       }
+
+      // Send per-product material download links to guest
+      try {
+        const filesResult = await query(
+          `SELECT pf.product_id AS "productId", f.file_name AS "fileName", f.file_url AS "fileUrl"
+             FROM Files f
+             JOIN ProductFiles pf ON pf.file_id = f.file_id
+            WHERE pf.product_id = ANY($1::int[])
+            ORDER BY pf.product_id, f.file_id`,
+          [productIds],
+        );
+        const filesByProduct = {};
+        for (const row of filesResult.rows) {
+          if (!filesByProduct[row.productId]) { filesByProduct[row.productId] = []; }
+          filesByProduct[row.productId].push({ fileName: row.fileName, fileUrl: row.fileUrl });
+        }
+        for (const product of (productsResult?.rows ?? [])) {
+          const files = filesByProduct[product.product_id];
+          if (files?.length) {
+            await emailService.sendProductMaterials(guestEmail, product.product_title, files);
+          }
+        }
+      } catch (emailErr) {
+        logger.warn('Could not send guest product materials email', { requestId, guestEmail, productIds, error: emailErr.message });
+      }
+
       logger.info('Guest cart purchase recorded', { requestId, productIds, guestEmail, liqpayOrderId });
     } else {
       // Authenticated user cart: cart_{ids}_{userId}_{timestamp}
@@ -451,14 +552,80 @@ async function processVerifiedPayload(payload, requestId) {
         );
       }
       logger.info('Cart purchase recorded', { requestId, productIds, userId, liqpayOrderId });
+
+      // Auto-send product materials to the authenticated user (one email per product)
+      try {
+        const [userResult, productsResult, filesResult] = await Promise.all([
+          query('SELECT user_email FROM Users WHERE user_id = $1', [userId]),
+          query(
+            'SELECT product_id, product_title FROM Products WHERE product_id = ANY($1::int[])',
+            [productIds],
+          ),
+          query(
+            `SELECT pf.product_id AS "productId", f.file_name AS "fileName", f.file_url AS "fileUrl"
+               FROM Files f
+               JOIN ProductFiles pf ON pf.file_id = f.file_id
+              WHERE pf.product_id = ANY($1::int[])
+              ORDER BY pf.product_id, f.file_id`,
+            [productIds],
+          ),
+        ]);
+        const userEmail = userResult.rows[0]?.user_email;
+        if (userEmail) {
+          const filesByProduct = {};
+          for (const row of filesResult.rows) {
+            if (!filesByProduct[row.productId]) { filesByProduct[row.productId] = []; }
+            filesByProduct[row.productId].push({ fileName: row.fileName, fileUrl: row.fileUrl });
+          }
+          for (const product of productsResult.rows) {
+            const files = filesByProduct[product.product_id];
+            if (files?.length) {
+              await emailService.sendProductMaterials(userEmail, product.product_title, files);
+            }
+          }
+        }
+      } catch (emailErr) {
+        logger.warn('Could not send cart materials email (auth user)', {
+          requestId, userId, productIds, error: emailErr.message,
+        });
+      }
     }
   } else if (liqpayOrderId.startsWith('personalorder_')) {
     const orderId = Number(liqpayOrderId.replace('personalorder_', ''));
     await query(
       'UPDATE PersonalOrders SET order_status = $1 WHERE order_id = $2',
-      ['Оплачено', orderId],
+      ['paid', orderId],
     );
     logger.info('Personal order marked paid', { requestId, orderId, liqpayOrderId });
+
+    // Auto-send order materials if files are already attached (silent if none yet)
+    try {
+      const [orderDataResult, filesResult] = await Promise.all([
+        query(
+          `SELECT po.order_title, u.user_email
+             FROM PersonalOrders po
+             JOIN Users u ON u.user_id = po.user_id
+            WHERE po.order_id = $1`,
+          [orderId],
+        ),
+        query(
+          `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+             FROM Files f
+             JOIN PersonalOrderFiles pof ON pof.file_id = f.file_id
+            WHERE pof.order_id = $1
+            ORDER BY f.file_id`,
+          [orderId],
+        ),
+      ]);
+      const { order_title, user_email } = orderDataResult.rows[0] ?? {};
+      if (user_email && filesResult.rows.length > 0) {
+        await emailService.sendOrderMaterials(user_email, order_title, filesResult.rows);
+      }
+    } catch (emailErr) {
+      logger.warn('Could not send personal order materials email at payment', {
+        requestId, orderId, error: emailErr.message,
+      });
+    }
   } else {
     logger.warn('Unrecognised order_id format', { requestId, liqpayOrderId });
     return false;
@@ -549,7 +716,7 @@ router.get('/result', async (req, res) => {
  * by checking the LiqPay signature against our private key.  On successful
  * payment the appropriate DB record is updated:
  * - `product_*` orders insert a row into `BoughtUserProducts`.
- * - `personalorder_*` orders set `order_status = 'Оплачено'` on the
+ * - `personalorder_*` orders set `order_status = 'paid'` on the
  *   corresponding `PersonalOrders` row.
  *
  * LiqPay retries callbacks until it receives HTTP 200, so this handler always

@@ -14,6 +14,13 @@
 
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import logger from '../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 
 dotenv.config();
 
@@ -238,6 +245,157 @@ class EmailService {
     } catch (error) {
       console.error('❌ Error sending guest purchase confirmation:', error.message);
       throw new Error('Failed to send guest purchase confirmation email');
+    }
+  }
+  /**
+   * Sends an email with purchased product materials attached as files.
+   *
+   * Called automatically after a successful payment and on-demand via the
+   * resend endpoint.  Files are attached directly to the email; download
+   * links are also included in the body as a fallback in case attachments
+   * are stripped by the recipient's mail provider.
+   * @param {string} email - Recipient email address.
+   * @param {string} productTitle - Title of the purchased product.
+   * @param {Array<{fileName: string, fileUrl: string}>} files - File objects
+   *   with absolute download URLs (as stored in the `Files` table).
+   * @returns {Promise<true>} Resolves with `true` on successful delivery.
+   * @throws {Error} Throws if nodemailer encounters a delivery error.
+   * @example
+   * await emailService.sendProductMaterials(
+   *   'buyer@example.com',
+   *   'Сценарій для дня народження',
+   *   [{ fileName: 'script.pdf', fileUrl: 'https://localhost:5001/uploads/products/1/script.pdf' }]
+   * );
+   */
+  async sendProductMaterials(email, productTitle, files) {
+    try {
+      const attachments = files.map((f) => ({
+        filename: f.fileName,
+        path: path.join(UPLOADS_DIR, new URL(f.fileUrl).pathname.replace(/^\/uploads\//, '')),
+      }));
+
+      const fileLinks = files
+        .map(
+          (f) =>
+            `<li style="margin-bottom:10px;">
+               <a href="${f.fileUrl}" style="color:#5e89e8;text-decoration:none;font-size:15px;">${f.fileName}</a>
+             </li>`,
+        )
+        .join('');
+
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || '"Muza Life" <noreply@muzalife.com>',
+        to: email,
+        subject: `Ваші матеріали: ${productTitle} — Muza Life`,
+        attachments,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+            <div style="text-align:center;margin-bottom:30px;">
+              <h1 style="color:#5e89e8;">Muza Life</h1>
+            </div>
+            <div style="background-color:#f8f9fa;padding:30px;border-radius:10px;">
+              <h2 style="color:#333;margin-bottom:16px;">Ваші матеріали готові!</h2>
+              <p style="color:#666;font-size:16px;margin-bottom:20px;">
+                Матеріали «<strong>${productTitle}</strong>» додані до цього листа як вкладення.
+              </p>
+              <p style="color:#999;font-size:13px;margin-top:4px;margin-bottom:20px;">
+                Якщо вкладення не відображаються, скористайтесь посиланнями нижче:
+              </p>
+              <ul style="color:#444;font-size:15px;padding-left:20px;">
+                ${fileLinks}
+              </ul>
+            </div>
+            <div style="text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #eee;">
+              <p style="color:#999;font-size:12px;">
+                &copy; ${new Date().getFullYear()} Muza Life. Всі права захищені.
+              </p>
+            </div>
+          </div>
+        `,
+        text: `Ваші матеріали: ${productTitle}\n\nФайли додані як вкладення. Якщо вкладення не відображаються:\n${files.map((f) => `${f.fileName}: ${f.fileUrl}`).join('\n')}\n\n© ${new Date().getFullYear()} Muza Life`,
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      return true;
+    } catch (error) {
+      logger.error('Error sending product materials email', { email, error: error.message });
+      throw new Error('Failed to send product materials email');
+    }
+  }
+
+  /**
+   * Sends an email to the order owner with personal order files attached.
+   *
+   * Called by admin via `POST /api/personal-orders/:orderId/send-materials` after
+   * uploading the completed order files.  Also triggered automatically at payment
+   * time when files are already attached to the order.  Files are attached
+   * directly to the email; download links are included as a fallback.
+   * @param {string} email - Recipient email address (order owner).
+   * @param {string} orderTitle - Title of the personal order.
+   * @param {Array<{fileName: string, fileUrl: string}>} files - File objects
+   *   with absolute download URLs (as stored in the `Files` table).
+   * @returns {Promise<true>} Resolves with `true` on successful delivery.
+   * @throws {Error} Throws if nodemailer encounters a delivery error.
+   * @example
+   * await emailService.sendOrderMaterials(
+   *   'client@example.com',
+   *   'Індивідуальний квест',
+   *   [{ fileName: 'quest.pdf', fileUrl: 'https://localhost:5001/uploads/personal-orders/5/quest.pdf' }]
+   * );
+   */
+  async sendOrderMaterials(email, orderTitle, files) {
+    try {
+      const attachments = files.map((f) => ({
+        filename: f.fileName,
+        path: path.join(UPLOADS_DIR, new URL(f.fileUrl).pathname.replace(/^\/uploads\//, '')),
+      }));
+
+      const fileLinks = files
+        .map(
+          (f) =>
+            `<li style="margin-bottom:10px;">
+               <a href="${f.fileUrl}" style="color:#5e89e8;text-decoration:none;font-size:15px;">${f.fileName}</a>
+             </li>`,
+        )
+        .join('');
+
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || '"Muza Life" <noreply@muzalife.com>',
+        to: email,
+        subject: `Матеріали вашого замовлення: ${orderTitle} — Muza Life`,
+        attachments,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+            <div style="text-align:center;margin-bottom:30px;">
+              <h1 style="color:#5e89e8;">Muza Life</h1>
+            </div>
+            <div style="background-color:#f8f9fa;padding:30px;border-radius:10px;">
+              <h2 style="color:#333;margin-bottom:16px;">Матеріали вашого замовлення готові!</h2>
+              <p style="color:#666;font-size:16px;margin-bottom:20px;">
+                Матеріали замовлення «<strong>${orderTitle}</strong>» додані до цього листа як вкладення.
+              </p>
+              <p style="color:#999;font-size:13px;margin-top:4px;margin-bottom:20px;">
+                Якщо вкладення не відображаються, скористайтесь посиланнями нижче:
+              </p>
+              <ul style="color:#444;font-size:15px;padding-left:20px;">
+                ${fileLinks}
+              </ul>
+            </div>
+            <div style="text-align:center;margin-top:30px;padding-top:20px;border-top:1px solid #eee;">
+              <p style="color:#999;font-size:12px;">
+                &copy; ${new Date().getFullYear()} Muza Life. Всі права захищені.
+              </p>
+            </div>
+          </div>
+        `,
+        text: `Матеріали замовлення: ${orderTitle}\n\nФайли додані як вкладення. Якщо вкладення не відображаються:\n${files.map((f) => `${f.fileName}: ${f.fileUrl}`).join('\n')}\n\n© ${new Date().getFullYear()} Muza Life`,
+      };
+
+      await this.transporter.sendMail(mailOptions);
+      return true;
+    } catch (error) {
+      logger.error('Error sending order materials email', { email, error: error.message });
+      throw new Error('Failed to send order materials email');
     }
   }
 }
