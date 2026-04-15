@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: ServiceUnavailableError</title>
+    <title>JSDoc: Module: controllers/guestController</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: ServiceUnavailableError</h1>
+    <h1 class="page-title">Module: controllers/guestController</h1>
 
     
 
@@ -28,10 +28,8 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>
-            <span class="ancestors"><a href="module-utils_AppError.html">utils/AppError</a>.</span>ServiceUnavailableError<span class="signature">(message, context)</span><span class="type-signature"></span></h2>
         
-            <div class="class-description"><p>503 Service Unavailable — server is intentionally offline / overloaded.</p></div>
+            
         
     
 </header>
@@ -40,99 +38,29 @@
     <div class="container-overview">
     
         
-
-    
-    <h2>Constructor</h2>
-    
-
-    
-    <h4 class="name" id="ServiceUnavailableError"><span class="type-signature"></span>new ServiceUnavailableError<span class="signature">(message, context)</span><span class="type-signature"></span></h4>
-    
-
-    
-
-
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
+            <div class="description"><p>Guest checkout controller — email OTP verification without account creation.</p>
+<p>Provides three handlers for the guest checkout flow:</p>
+<ol>
+<li>initiateGuestVerification — sends a 6-digit OTP to the supplied email.</li>
+<li>confirmGuestEmail         — verifies the OTP and returns a short-lived guest JWT.</li>
+<li>resendGuestVerification   — re-sends a fresh OTP.</li>
+</ol>
+<p>No user account is created at any point.  The guest JWT returned by
+confirmGuestEmail is used solely to authorise the cart payment
+initiation endpoint.</p></div>
         
 
         
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>message</code></td>
             
 
-            <td class="type">
-            
-            </td>
 
-            
 
-            
-                <td class="default">
-                
-                    Service temporarily unavailable
-                
-                </td>
-            
 
-            <td class="description last"></td>
-        </tr>
 
-    
 
-        <tr>
-            
-                <td class="name"><code>context</code></td>
-            
 
-            <td class="type">
-            
-            </td>
 
-            
 
-            
-                <td class="default">
-                
-                </td>
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-    </tbody>
-</table>
 
 
 
@@ -168,7 +96,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="utils_AppError.js.html">utils/AppError.js</a>, <a href="utils_AppError.js.html#line185">line 185</a>
+        <a href="controllers_guestController.js.html">controllers/guestController.js</a>, <a href="controllers_guestController.js.html#line1">line 1</a>
     </li></ul></dd>
     
 
@@ -198,6 +126,7 @@
 
 
 
+        
     
     </div>
 
@@ -213,6 +142,209 @@
 
     
 
+    
+        <h3 class="subsection-title">Members</h3>
+
+        
+            
+<h4 class="name" id=".confirmGuestEmail"><span class="type-signature">(static, constant) </span>confirmGuestEmail<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Verifies the OTP and returns a short-lived guest JWT.</p>
+<p>On success the caller receives a <code>token</code> valid for 30 minutes.  This token
+must be passed as <code>Authorization: Bearer &lt;token&gt;</code> to
+<code>POST /api/payments/cart/initiate</code>.</p>
+<p><strong>Request body:</strong> <code>{ email: string, code: string }</code></p>
+<p><strong>Response:</strong> <code>{ success: true, token: string }</code></p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="controllers_guestController.js.html">controllers/guestController.js</a>, <a href="controllers_guestController.js.html#line80">line 80</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id=".initiateGuestVerification"><span class="type-signature">(static, constant) </span>initiateGuestVerification<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Sends a 6-digit OTP to the given email address for guest checkout.</p>
+<p>Unlike the registration flow, this handler does <strong>not</strong> check whether the
+email already belongs to a registered user — any email that can receive mail
+is valid for guest checkout.</p>
+<p><strong>Request body:</strong> <code>{ email: string }</code></p>
+<p><strong>Response:</strong> <code>{ success: true, message: { uk, en } }</code></p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="controllers_guestController.js.html">controllers/guestController.js</a>, <a href="controllers_guestController.js.html#line36">line 36</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
+<h4 class="name" id=".resendGuestVerification"><span class="type-signature">(static, constant) </span>resendGuestVerification<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Re-generates and re-sends a fresh OTP for guest checkout.</p>
+<p>The previous code is automatically invalidated by the verification service.</p>
+<p><strong>Request body:</strong> <code>{ email: string }</code></p>
+<p><strong>Response:</strong> <code>{ success: true, message: { uk, en } }</code></p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="controllers_guestController.js.html">controllers/guestController.js</a>, <a href="controllers_guestController.js.html#line132">line 132</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
     
 
     
