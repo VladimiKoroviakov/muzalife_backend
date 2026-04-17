@@ -101,7 +101,7 @@ functionality remains available.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line23">line 23</a>
+        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line30">line 30</a>
     </li></ul></dd>
     
 
@@ -212,7 +212,7 @@ logs the result.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line46">line 46</a>
+        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line53">line 53</a>
     </li></ul></dd>
     
 
@@ -384,7 +384,7 @@ rendered HTML without actually receiving the email.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line101">line 101</a>
+        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line108">line 108</a>
     </li></ul></dd>
     
 
@@ -576,7 +576,7 @@ to the verified email address.</p>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line194">line 194</a>
+        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line201">line 201</a>
     </li></ul></dd>
     
 
@@ -661,6 +661,502 @@ to the verified email address.</p>
     <pre class="prettyprint"><code>await emailService.sendGuestPurchaseConfirmation(
   'guest@example.com',
   ['Сценарій для дня народження', 'Квест для дітей']
+);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="sendOrderMaterials"><span class="type-signature">(async) </span>sendOrderMaterials<span class="signature">(email, orderTitle, files)</span><span class="type-signature"> &rarr; {Promise.&lt;true>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Sends an email to the order owner with personal order files attached.</p>
+<p>Called by admin via <code>POST /api/personal-orders/:orderId/send-materials</code> after
+uploading the completed order files.  Also triggered automatically at payment
+time when files are already attached to the order.  Files are attached
+directly to the email; download links are included as a fallback.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>email</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Recipient email address (order owner).</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>orderTitle</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Title of the personal order.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>files</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;{fileName: string, fileUrl: string}></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>File objects
+with absolute download URLs (as stored in the <code>Files</code> table).</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line346">line 346</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        <p>Throws if nodemailer encounters a delivery error.</p>
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">Error</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Resolves with <code>true</code> on successful delivery.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;true></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>await emailService.sendOrderMaterials(
+  'client@example.com',
+  'Індивідуальний квест',
+  [{ fileName: 'quest.pdf', fileUrl: 'https://localhost:5001/uploads/personal-orders/5/quest.pdf' }]
+);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="sendProductMaterials"><span class="type-signature">(async) </span>sendProductMaterials<span class="signature">(email, productTitle, files)</span><span class="type-signature"> &rarr; {Promise.&lt;true>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Sends an email with purchased product materials attached as files.</p>
+<p>Called automatically after a successful payment and on-demand via the
+resend endpoint.  Files are attached directly to the email; download
+links are also included in the body as a fallback in case attachments
+are stripped by the recipient's mail provider.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>email</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Recipient email address.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>productTitle</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Title of the purchased product.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>files</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;{fileName: string, fileUrl: string}></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>File objects
+with absolute download URLs (as stored in the <code>Files</code> table).</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line270">line 270</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Throws:</h5>
+
+        
+
+<dl>
+    <dt>
+        <div class="param-desc">
+        <p>Throws if nodemailer encounters a delivery error.</p>
+        </div>
+    </dt>
+    <dd></dd>
+    <dt>
+        <dl>
+            <dt>
+                Type
+            </dt>
+            <dd>
+                
+<span class="param-type">Error</span>
+
+
+            </dd>
+        </dl>
+    </dt>
+    <dd></dd>
+</dl>
+
+
+    
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    <p>Resolves with <code>true</code> on successful delivery.</p>
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;true></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>await emailService.sendProductMaterials(
+  'buyer@example.com',
+  'Сценарій для дня народження',
+  [{ fileName: 'script.pdf', fileUrl: 'https://localhost:5001/uploads/products/1/script.pdf' }]
 );</code></pre>
 
 
@@ -866,7 +1362,7 @@ verification: <code>'registration'</code> (new account) or <code>'email_change'<
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line126">line 126</a>
+        <a href="services_emailService.js.html">services/emailService.js</a>, <a href="services_emailService.js.html#line133">line 133</a>
     </li></ul></dd>
     
 

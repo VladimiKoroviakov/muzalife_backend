@@ -30,6 +30,7 @@ import pool from '../config/database.js';
 import { appCache, TTL_PRODUCTS_LIST, TTL_PRODUCT_SINGLE } from '../utils/cache.js';
 import { authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { applyWatermark } from '../utils/watermark.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -430,7 +431,18 @@ router.post('/', authenticateToken, (req, res, next) => {
     // ── Handle downloadable files ─────────────────────────────────────────────
     if (req.files?.files?.length) {
       for (const file of req.files.files) {
-        const fileUrl = moveToProductDir(file, productId);
+        const fileUrl  = moveToProductDir(file, productId);
+        const destPath = path.join(UPLOADS_DIR, 'products', String(productId), file.filename);
+        try {
+          await applyWatermark(destPath, file.mimetype);
+        } catch (wmErr) {
+          logger.warn('Watermark failed, file saved without watermark', {
+            module: 'routes/products',
+            requestId: req.requestId,
+            filePath: destPath,
+            error: wmErr.message,
+          });
+        }
 
         const fileResult = await client.query(`
           INSERT INTO Files (file_name, file_url, file_size)
@@ -769,7 +781,18 @@ router.put('/:id', authenticateToken, (req, res, next) => {
     // ── Add files ────────────────────────────────────────────────────
     if (req.files?.files?.length) {
       for (const file of req.files.files) {
-        const fileUrl = moveToProductDir(file, productId, baseUrl);
+        const fileUrl  = moveToProductDir(file, productId, baseUrl);
+        const destPath = path.join(UPLOADS_DIR, 'products', String(productId), file.filename);
+        try {
+          await applyWatermark(destPath, file.mimetype);
+        } catch (wmErr) {
+          logger.warn('Watermark failed, file saved without watermark', {
+            module: 'routes/products',
+            requestId: req.requestId,
+            filePath: destPath,
+            error: wmErr.message,
+          });
+        }
         const fRow = await client.query(
           `INSERT INTO Files (file_name, file_url, file_size)
            VALUES ($1, $2, $3) RETURNING file_id`,

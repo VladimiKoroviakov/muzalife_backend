@@ -37,11 +37,78 @@
  */
 
 import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import multer from 'multer';
 import { query } from '../config/database.js';
+import pool from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { emailService } from '../services/emailService.js';
+import { ForbiddenError, NotFoundError } from '../utils/AppError.js';
 
 const router = express.Router();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = path.dirname(__filename);
+const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+
+// ── Multer — temporary storage for personal order file uploads ────────────────
+const orderTempStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    const dir = path.join(UPLOADS_DIR, 'temp');
+    if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+    cb(null, unique);
+  },
+});
+
+const ORDER_ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/zip',
+  'application/x-rar-compressed',
+  'application/octet-stream',
+  'image/jpeg',
+  'image/png',
+]);
+
+const orderFileUpload = multer({
+  storage: orderTempStorage,
+  fileFilter: (_req, file, cb) => {
+    if (ORDER_ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type not allowed: ${file.mimetype}`), false);
+    }
+  },
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
+}).fields([{ name: 'files', maxCount: 10 }]);
+
+// ── Helper: move uploaded file to the order directory ─────────────────────────
+const moveToOrderDir = (file, orderId, baseUrl = 'https://localhost:5001') => {
+  const destDir = path.join(UPLOADS_DIR, 'personal-orders', String(orderId));
+  if (!fs.existsSync(destDir)) { fs.mkdirSync(destDir, { recursive: true }); }
+  const destPath = path.join(destDir, file.filename);
+  fs.renameSync(file.path, destPath);
+  const relativePath = `/uploads/personal-orders/${orderId}/${file.filename}`;
+  return baseUrl ? `${baseUrl}${relativePath}` : relativePath;
+};
+
+// ── Helper: clean up temp files on error ─────────────────────────────────────
+const cleanupOrderTempFiles = (reqFiles) => {
+  if (!reqFiles) { return; }
+  for (const f of (reqFiles.files || [])) {
+    if (fs.existsSync(f.path)) { fs.unlinkSync(f.path); }
+  }
+};
 
 // All personal-order routes require a valid JWT
 router.use(authenticateToken);
@@ -230,6 +297,296 @@ router.post('/', async (req, res) => {
       success: false,
       error: { uk: 'Не вдалося створити замовлення', en: 'Failed to create personal order' },
     });
+  }
+});
+
+// ── GET /api/personal-orders/:orderId/files ───────────────────────────────────
+/**
+ * Returns the files attached to a personal order (admin only).
+ *
+ * **Auth:** admin
+ *
+ * **Response:**
+ * ```json
+ * { "success": true, "files": [{ "fileId", "fileName", "fileUrl", "fileSize" }] }
+ * ```
+ */
+router.get('/:orderId/files', async (req, res) => {
+  const orderId = parseInt(req.params.orderId, 10);
+  if (isNaN(orderId)) {
+    return res.status(400).json({ success: false, error: { uk: 'Некоректний ID замовлення', en: 'Invalid order ID' } });
+  }
+
+  try {
+    if (!(await isAdmin(req.userId))) {
+      return res.status(403).json({ success: false, error: { uk: 'Доступ лише для адміністраторів', en: 'Admins only' } });
+    }
+
+    const result = await query(`
+      SELECT
+        f.file_id   AS "fileId",
+        f.file_name AS "fileName",
+        f.file_url  AS "fileUrl",
+        f.file_size AS "fileSize"
+      FROM Files f
+      JOIN PersonalOrderFiles pof ON pof.file_id = f.file_id
+      WHERE pof.order_id = $1
+      ORDER BY f.file_id
+    `, [orderId]);
+
+    res.json({ success: true, files: result.rows });
+  } catch (error) {
+    logger.error('Error fetching personal order files', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      userId: req.userId,
+      error: error.message,
+    });
+    res.status(500).json({ success: false, error: { uk: 'Не вдалося отримати файли замовлення', en: 'Failed to fetch order files' } });
+  }
+});
+
+// ── POST /api/personal-orders/:orderId/files ──────────────────────────────────
+/**
+ * Uploads one or more files to an existing personal order (admin only).
+ * Accepts `multipart/form-data` with field name `files` (up to 10 files).
+ *
+ * **Auth:** admin
+ *
+ * **Response:** `201` with the newly created file records.
+ */
+router.post('/:orderId/files', (req, res, next) => {
+  orderFileUpload(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ success: false, error: { uk: `Помилка завантаження: ${err.message}`, en: `Upload error: ${err.message}` } });
+    }
+    if (err) {
+      return res.status(400).json({ success: false, error: { uk: err.message, en: err.message } });
+    }
+    next();
+  });
+}, async (req, res) => {
+  const orderId = parseInt(req.params.orderId, 10);
+  if (isNaN(orderId)) {
+    cleanupOrderTempFiles(req.files);
+    return res.status(400).json({ success: false, error: { uk: 'Некоректний ID замовлення', en: 'Invalid order ID' } });
+  }
+
+  const uploadedFiles = req.files?.files ?? [];
+  if (uploadedFiles.length === 0) {
+    return res.status(400).json({ success: false, error: { uk: 'Не надано жодного файлу', en: 'No files provided' } });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    if (!(await isAdmin(req.userId))) {
+      await client.query('ROLLBACK');
+      cleanupOrderTempFiles(req.files);
+      return res.status(403).json({ success: false, error: { uk: 'Доступ лише для адміністраторів', en: 'Admins only' } });
+    }
+
+    const orderCheck = await client.query('SELECT order_id FROM PersonalOrders WHERE order_id = $1', [orderId]);
+    if (orderCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      cleanupOrderTempFiles(req.files);
+      return res.status(404).json({ success: false, error: { uk: 'Замовлення не знайдено', en: 'Order not found' } });
+    }
+
+    const created = [];
+    for (const file of uploadedFiles) {
+      const fileUrl = moveToOrderDir(file, orderId);
+      const fileResult = await client.query(`
+        INSERT INTO Files (file_name, file_url, file_size)
+        VALUES ($1, $2, $3)
+        RETURNING file_id AS "fileId", file_name AS "fileName", file_url AS "fileUrl", file_size AS "fileSize"
+      `, [file.originalname, fileUrl, file.size]);
+
+      const inserted = fileResult.rows[0];
+      await client.query(
+        'INSERT INTO PersonalOrderFiles (order_id, file_id) VALUES ($1, $2)',
+        [orderId, inserted.fileId],
+      );
+      created.push(inserted);
+    }
+
+    await client.query('COMMIT');
+
+    logger.info('Files uploaded to personal order', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      fileCount: created.length,
+      userId: req.userId,
+    });
+
+    res.status(201).json({ success: true, files: created });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    cleanupOrderTempFiles(req.files);
+    logger.error('Error uploading files to personal order', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      userId: req.userId,
+      error: error.message,
+    });
+    res.status(500).json({ success: false, error: { uk: 'Не вдалося завантажити файли', en: 'Failed to upload files' } });
+  } finally {
+    client.release();
+  }
+});
+
+// ── POST /api/personal-orders/:orderId/send-materials ────────────────────────
+/**
+ * Sends (or re-sends) personal order material download links to the order owner.
+ *
+ * Admin-only.  Fetches all files attached to the order and emails them to the
+ * user who submitted the order.  Intended to be called after the admin has
+ * finished uploading the completed order files.
+ *
+ * **Auth:** authenticated admin
+ * @param {string} req.params.orderId - ID of the personal order.
+ * @returns {object} 200 - `{ success: true, message: { uk, en } }`
+ * @throws {ForbiddenError} 403 - Requester is not an admin.
+ * @throws {NotFoundError}  404 - Order not found or has no files attached.
+ */
+router.post('/:orderId/send-materials', async (req, res, next) => {
+  try {
+    if (!(await isAdmin(req.userId))) {
+      throw new ForbiddenError('Admin access required');
+    }
+
+    const orderId = parseInt(req.params.orderId, 10);
+    if (isNaN(orderId) || orderId &lt;= 0) {
+      throw new NotFoundError('Order not found', { orderId: req.params.orderId });
+    }
+
+    const [orderDataResult, filesResult] = await Promise.all([
+      query(
+        `SELECT po.order_title, u.user_email
+           FROM PersonalOrders po
+           JOIN Users u ON u.user_id = po.user_id
+          WHERE po.order_id = $1`,
+        [orderId],
+      ),
+      query(
+        `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+           FROM Files f
+           JOIN PersonalOrderFiles pof ON pof.file_id = f.file_id
+          WHERE pof.order_id = $1
+          ORDER BY f.file_id`,
+        [orderId],
+      ),
+    ]);
+
+    if (!orderDataResult.rows.length) {
+      throw new NotFoundError('Order not found', { orderId });
+    }
+
+    if (!filesResult.rows.length) {
+      throw new NotFoundError('No files found for this order', { orderId });
+    }
+
+    const { order_title, user_email } = orderDataResult.rows[0];
+
+    await emailService.sendOrderMaterials(user_email, order_title, filesResult.rows);
+
+    logger.info('Order materials sent by admin', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      adminUserId: req.userId,
+    });
+
+    res.json({
+      success: true,
+      message: {
+        uk: 'Матеріали надіслано замовнику',
+        en: 'Materials sent to the order owner',
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── DELETE /api/personal-orders/:orderId/files/:fileId ────────────────────────
+/**
+ * Removes a file from a personal order and deletes it from disk (admin only).
+ *
+ * **Auth:** admin
+ *
+ * **Response:** `{ "success": true }`
+ */
+router.delete('/:orderId/files/:fileId', async (req, res) => {
+  const orderId = parseInt(req.params.orderId, 10);
+  const fileId  = parseInt(req.params.fileId, 10);
+
+  if (isNaN(orderId) || isNaN(fileId)) {
+    return res.status(400).json({ success: false, error: { uk: 'Некоректний ID', en: 'Invalid ID' } });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    if (!(await isAdmin(req.userId))) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ success: false, error: { uk: 'Доступ лише для адміністраторів', en: 'Admins only' } });
+    }
+
+    const fileRow = await client.query(
+      'SELECT f.file_url FROM Files f JOIN PersonalOrderFiles pof ON pof.file_id = f.file_id WHERE pof.order_id = $1 AND f.file_id = $2',
+      [orderId, fileId],
+    );
+
+    if (fileRow.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: { uk: 'Файл не знайдено', en: 'File not found' } });
+    }
+
+    await client.query('DELETE FROM PersonalOrderFiles WHERE order_id = $1 AND file_id = $2', [orderId, fileId]);
+    await client.query('DELETE FROM Files WHERE file_id = $1', [fileId]);
+
+    // Remove physical file
+    const fileUrl = fileRow.rows[0].file_url;
+    try {
+      // fileUrl is an absolute URL like https://localhost:5001/uploads/...
+      // Extract the path portion after the origin
+      const urlPath = fileUrl.replace(/^https?:\/\/[^/]+/, '');
+      const diskPath = path.join(__dirname, '..', urlPath);
+      if (fs.existsSync(diskPath)) { fs.unlinkSync(diskPath); }
+    } catch {
+      // Non-fatal: DB is already cleaned up
+    }
+
+    await client.query('COMMIT');
+
+    logger.info('File removed from personal order', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      fileId,
+      userId: req.userId,
+    });
+
+    res.json({ success: true, message: { uk: 'Файл успішно видалено', en: 'File deleted successfully' } });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error deleting personal order file', {
+      module: 'routes/personalOrders',
+      requestId: req.requestId,
+      orderId,
+      fileId,
+      userId: req.userId,
+      error: error.message,
+    });
+    res.status(500).json({ success: false, error: { uk: 'Не вдалося видалити файл', en: 'Failed to delete file' } });
+  } finally {
+    client.release();
   }
 });
 

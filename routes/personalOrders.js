@@ -19,6 +19,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 import { emailService } from '../services/emailService.js';
 import { ForbiddenError, NotFoundError } from '../utils/AppError.js';
+import { applyWatermark } from '../utils/watermark.js';
 
 const router = express.Router();
 
@@ -369,7 +370,18 @@ router.post('/:orderId/files', (req, res, next) => {
 
     const created = [];
     for (const file of uploadedFiles) {
-      const fileUrl = moveToOrderDir(file, orderId);
+      const fileUrl  = moveToOrderDir(file, orderId);
+      const destPath = path.join(UPLOADS_DIR, 'personal-orders', String(orderId), file.filename);
+      try {
+        await applyWatermark(destPath, file.mimetype);
+      } catch (wmErr) {
+        logger.warn('Watermark failed, file saved without watermark', {
+          module: 'routes/personalOrders',
+          requestId: req.requestId,
+          filePath: destPath,
+          error: wmErr.message,
+        });
+      }
       const fileResult = await client.query(`
         INSERT INTO Files (file_name, file_url, file_size)
         VALUES ($1, $2, $3)

@@ -320,12 +320,41 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
         throw new ForbiddenError('Order does not belong to this user', { orderId, userId });
       }
 
-      await query(
-        'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      const insertResult = await query(
+        'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING product_id',
         [userId, productId],
       );
 
       logger.info('Product purchase verified and recorded', { requestId: req.requestId, userId, productId, orderId });
+
+      if (insertResult.rows.length > 0) {
+        try {
+          const [userResult, productTitleResult, filesResult] = await Promise.all([
+            query('SELECT user_email FROM Users WHERE user_id = $1', [userId]),
+            query('SELECT product_title FROM Products WHERE product_id = $1', [productId]),
+            query(
+              `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+                 FROM Files f
+                 JOIN ProductFiles pf ON pf.file_id = f.file_id
+                WHERE pf.product_id = $1
+                ORDER BY f.file_id`,
+              [productId],
+            ),
+          ]);
+          const userEmail = userResult.rows[0]?.user_email;
+          if (userEmail && filesResult.rows.length > 0) {
+            await emailService.sendProductMaterials(
+              userEmail,
+              productTitleResult.rows[0]?.product_title ?? '',
+              filesResult.rows,
+            );
+          }
+        } catch (emailErr) {
+          logger.warn('Could not send product materials email (verify fallback)', {
+            requestId: req.requestId, userId, productId, error: emailErr.message,
+          });
+        }
+      }
     } else if (orderId.startsWith('cart_')) {
       // Detect guest cart order: cart_{ids}_guest_{base64email}_{timestamp}
       const parts = orderId.split('_');
@@ -403,21 +432,61 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
           throw new ForbiddenError('Order does not belong to this user', { orderId, userId });
         }
 
+        let newRows = 0;
         for (const productId of productIds) {
-          await query(
-            'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          const result = await query(
+            'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING product_id',
             [userId, productId],
           );
+          newRows += result.rows.length;
         }
 
         logger.info('Cart purchase verified and recorded', { requestId: req.requestId, userId, productIds, orderId });
+
+        if (newRows > 0) {
+          try {
+            const [userResult, productsResult, filesResult] = await Promise.all([
+              query('SELECT user_email FROM Users WHERE user_id = $1', [userId]),
+              query(
+                'SELECT product_id, product_title FROM Products WHERE product_id = ANY($1::int[])',
+                [productIds],
+              ),
+              query(
+                `SELECT pf.product_id AS "productId", f.file_name AS "fileName", f.file_url AS "fileUrl"
+                   FROM Files f
+                   JOIN ProductFiles pf ON pf.file_id = f.file_id
+                  WHERE pf.product_id = ANY($1::int[])
+                  ORDER BY pf.product_id, f.file_id`,
+                [productIds],
+              ),
+            ]);
+            const userEmail = userResult.rows[0]?.user_email;
+            if (userEmail) {
+              const filesByProduct = {};
+              for (const row of filesResult.rows) {
+                if (!filesByProduct[row.productId]) { filesByProduct[row.productId] = []; }
+                filesByProduct[row.productId].push({ fileName: row.fileName, fileUrl: row.fileUrl });
+              }
+              for (const product of productsResult.rows) {
+                const files = filesByProduct[product.product_id];
+                if (files?.length) {
+                  await emailService.sendProductMaterials(userEmail, product.product_title, files);
+                }
+              }
+            }
+          } catch (emailErr) {
+            logger.warn('Could not send cart materials email (verify fallback, auth user)', {
+              requestId: req.requestId, userId, productIds, error: emailErr.message,
+            });
+          }
+        }
       }
     } else if (orderId.startsWith('personalorder_')) {
       // Format: personalorder_{orderId}
       const personalOrderId = Number(orderId.replace('personalorder_', ''));
 
       const orderResult = await query(
-        'SELECT user_id FROM PersonalOrders WHERE order_id = $1',
+        'SELECT user_id, order_status FROM PersonalOrders WHERE order_id = $1',
         [personalOrderId],
       );
 
@@ -425,12 +494,44 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
         throw new ForbiddenError('Order does not belong to this user', { personalOrderId, userId });
       }
 
+      const alreadyPaid = orderResult.rows[0].order_status === 'paid';
+
       await query(
         'UPDATE PersonalOrders SET order_status = $1 WHERE order_id = $2',
         ['paid', personalOrderId],
       );
 
       logger.info('Personal order verified and marked paid', { requestId: req.requestId, userId, personalOrderId, orderId });
+
+      if (!alreadyPaid) {
+        try {
+          const [orderDataResult, filesResult] = await Promise.all([
+            query(
+              `SELECT po.order_title, u.user_email
+                 FROM PersonalOrders po
+                 JOIN Users u ON u.user_id = po.user_id
+                WHERE po.order_id = $1`,
+              [personalOrderId],
+            ),
+            query(
+              `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+                 FROM Files f
+                 JOIN PersonalOrderFiles pof ON pof.file_id = f.file_id
+                WHERE pof.order_id = $1
+                ORDER BY f.file_id`,
+              [personalOrderId],
+            ),
+          ]);
+          const { order_title, user_email } = orderDataResult.rows[0] ?? {};
+          if (user_email && filesResult.rows.length > 0) {
+            await emailService.sendOrderMaterials(user_email, order_title, filesResult.rows);
+          }
+        } catch (emailErr) {
+          logger.warn('Could not send personal order materials email (verify fallback)', {
+            requestId: req.requestId, userId, personalOrderId, error: emailErr.message,
+          });
+        }
+      }
     } else {
       throw new ValidationError('Unrecognised orderId format', { orderId });
     }
