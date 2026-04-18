@@ -312,6 +312,8 @@ async function watermarkZip(filePath) {
       fs.writeFileSync(tmp, entry.getData());
       await watermarkArchiveEntry(tmp, ext);
       zip.updateFile(entry.entryName, fs.readFileSync(tmp));
+    } catch {
+      // skip unprocessable entry; continue with remaining entries
     } finally {
       fs.rmSync(tmp, { force: true });
     }
@@ -348,6 +350,8 @@ async function watermarkRar(filePath) {
       fs.writeFileSync(tmp, buf);
       await watermarkArchiveEntry(tmp, ext);
       outZip.addFile(name, fs.readFileSync(tmp));
+    } catch {
+      outZip.addFile(name, buf); // include original entry without watermark
     } finally {
       fs.rmSync(tmp, { force: true });
     }
@@ -372,12 +376,23 @@ export async function applyWatermark(filePath, mimetype) {
   } else if (mimetype === 'application/pdf') {
     await watermarkPdf(filePath);
   } else if (mimetype === 'application/zip' || mimetype === 'application/x-zip-compressed') {
-    await watermarkZip(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.docx')      { await watermarkDocx(filePath); }
+    else if (ext === '.pptx') { await watermarkPptx(filePath); }
+    else                      { await watermarkZip(filePath); }
   } else if (RAR_MIMES.has(mimetype)) {
     await watermarkRar(filePath);
   } else if (mimetype.includes('wordprocessingml.document')) {
     await watermarkDocx(filePath);
   } else if (mimetype.includes('presentationml.presentation')) {
     await watermarkPptx(filePath);
+  } else if (mimetype === 'application/octet-stream') {
+    const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.rar')                      { await watermarkRar(filePath); }
+    else if (ext === '.zip')                 { await watermarkZip(filePath); }
+    else if (ext === '.pdf')                 { await watermarkPdf(filePath); }
+    else if (ext === '.docx')                { await watermarkDocx(filePath); }
+    else if (ext === '.pptx')                { await watermarkPptx(filePath); }
+    else if (ext === '.jpg' || ext === '.jpeg' || ext === '.png') { await watermarkImage(filePath); }
   }
 }

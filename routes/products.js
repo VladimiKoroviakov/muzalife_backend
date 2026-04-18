@@ -751,8 +751,12 @@ router.put('/:id', authenticateToken, (req, res, next) => {
               fs.unlinkSync(diskPath);
             }
           } catch (err) {
-            console.error(`Failed to delete file at ${diskPath}:`, err);
-            // We continue anyway to keep DB and Disk in sync as much as possible
+            logger.warn('Failed to delete image file from disk', {
+              module: 'routes/products',
+              requestId: req.requestId,
+              diskPath,
+              error: err.message,
+            });
           }
 
           // Handle Database Deletion
@@ -840,8 +844,12 @@ router.put('/:id', authenticateToken, (req, res, next) => {
     await client.query('ROLLBACK');
     cleanupTempFiles(req.files);
 
-    // THIS IS THE MOST IMPORTANT LOG
-    console.error('DEBUG PUT ERROR:', error);
+    logger.error('Failed to update product', {
+      module: 'routes/products',
+      requestId: req.requestId,
+      productId,
+      error: error.message,
+    });
 
     res.status(500).json({
       success: false,
