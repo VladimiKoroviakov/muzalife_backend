@@ -93,7 +93,7 @@ const setupDatabase = async () => {
         CREATE TABLE Products (
             product_id SERIAL PRIMARY KEY,
             product_title VARCHAR(255) NOT NULL,
-            product_description VARCHAR(500) NOT NULL,
+            product_description TEXT NOT NULL,
             product_main_img_url VARCHAR(500) NOT NULL,
             product_price DECIMAL(10,2) NOT NULL,
             product_rating DECIMAL(2,1) NOT NULL CHECK (product_rating >= 0 AND product_rating <= 5),
@@ -139,23 +139,13 @@ const setupDatabase = async () => {
 
         -- Enum for order statuses
         CREATE TYPE order_status_enum AS ENUM (
-            'Чернетка',
-            'Нове замовлення',
-            'Очікує оплату',
-            'Оплачено',
-            'Прийнято',
-            'В черзі',
-            'В розробці',
-            'Очікує підтвердження',
-            'Призупинено',
-            'На перевірці',
-            'Виконано',
-            'Скасовано клієнтом',
-            'Скасовано системою',
-            'Відхилено',
-            'Повернення коштів',
-            'Повернено',
-            'Архівовано'
+            'pending',
+            'in_review',
+            'accepted',
+            'declined',
+            'paid',
+            'in_development',
+            'done'
         );
 
         -- PersonalOrders table
@@ -164,15 +154,29 @@ const setupDatabase = async () => {
             user_id INTEGER NOT NULL,
             order_title VARCHAR(255) NOT NULL,
             order_description TEXT NOT NULL,
-            order_status order_status_enum NOT NULL DEFAULT 'Нове замовлення',
-            order_price DECIMAL(10,2) NOT NULL,
+            order_decline_reason TEXT,
+            order_status order_status_enum NOT NULL DEFAULT 'pending',
+            order_price DECIMAL(10,2),
             order_material_type_id INTEGER NOT NULL,
             order_material_age_category_id INTEGER NOT NULL,
             order_deadline TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            order_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            order_created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            order_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
             FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE,
-            CONSTRAINT fk_order_material_type FOREIGN KEY (order_material_type_id) REFERENCES ProductTypes(product_type_id) ON DELETE RESTRICT ON UPDATE cascade,
-            CONSTRAINT fk_order_material_age_category FOREIGN KEY (order_material_age_category_id) REFERENCES AgeCategories(age_category_id) ON DELETE RESTRICT ON UPDATE CASCADE
+            CONSTRAINT fk_order_material_type FOREIGN KEY (order_material_type_id) REFERENCES ProductTypes(product_type_id) ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT fk_order_material_age_category FOREIGN KEY (order_material_age_category_id) REFERENCES AgeCategories(age_category_id) ON DELETE RESTRICT ON UPDATE CASCADE,
+            CONSTRAINT check_order_decline_reason CHECK (
+                (order_status = 'declined' AND order_decline_reason IS NOT NULL)
+                OR
+                (order_status != 'declined' AND order_decline_reason IS NULL)
+            ),
+            CONSTRAINT check_price_when_active CHECK (
+                (order_status IN ('pending', 'in_review') AND order_price IS NULL)
+                OR
+                (order_status IN ('accepted', 'paid', 'in_development', 'done') AND order_price IS NOT NULL)
+                OR
+                (order_status = 'declined')
+            )
         );
 
         -------------- Junction tables for many-to-many relationships --------------------
@@ -222,6 +226,7 @@ const setupDatabase = async () => {
         CREATE TABLE BoughtUserProducts (
             product_id INTEGER,
             user_id INTEGER,
+            order_id VARCHAR(500),
             bought_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (product_id, user_id),
             FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE,
@@ -230,13 +235,12 @@ const setupDatabase = async () => {
 
         -- GuestPurchases — records purchases made by unregistered guest shoppers
         CREATE TABLE GuestPurchases (
-            id SERIAL PRIMARY KEY,
             guest_email VARCHAR(255) NOT NULL,
             product_id INTEGER NOT NULL,
             order_id VARCHAR(500) NOT NULL,
             bought_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE,
-            UNIQUE (guest_email, product_id, order_id)
+            PRIMARY KEY (guest_email, product_id, order_id),
+            FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE
         );
 
         -- ProductEvents (junction table between Products and Events)
@@ -269,10 +273,8 @@ const setupDatabase = async () => {
         CREATE TABLE ProductViews (
             view_id SERIAL PRIMARY KEY,
             product_id INTEGER,
-            user_id INTEGER NULL, -- NULL for anonymous views
             viewed_at timestamp DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE,
-            FOREIGN KEY (user_id) REFERENCES Users(user_id)
+            FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE
         );
 
         CREATE TABLE PollUserVotes (
@@ -301,7 +303,6 @@ const setupDatabase = async () => {
 
         -- Add index for better performance
         CREATE INDEX idx_product_views_product_date ON ProductViews (product_id, viewed_at);
-        CREATE INDEX idx_product_views_user_date ON ProductViews (user_id, viewed_at);
 
         -- Creating indexes for better performance
         CREATE INDEX idx_users_email ON Users(user_email);
@@ -311,7 +312,7 @@ const setupDatabase = async () => {
         CREATE INDEX idx_products_title ON Products(product_title);
         CREATE INDEX idx_products_price ON Products(product_price);
         CREATE INDEX idx_products_rating ON Products(product_rating);
-        CREATE INDEX idx_products_type ON Products(product_type);
+        CREATE INDEX idx_products_type ON Products(product_type_id);
 
         CREATE INDEX idx_product_files_product_id ON ProductFiles(product_id);
         CREATE INDEX idx_reviews_rating ON Reviews(review_rating);
@@ -319,6 +320,7 @@ const setupDatabase = async () => {
         -- Junction table indexes
         CREATE INDEX idx_saved_user_products_user_id ON SavedUserProducts(user_id);
         CREATE INDEX idx_bought_user_products_user_id ON BoughtUserProducts(user_id);
+        CREATE INDEX IF NOT EXISTS idx_bought_user_products_order_id ON BoughtUserProducts(order_id);
         CREATE INDEX idx_guest_purchases_email ON GuestPurchases(guest_email);
         CREATE INDEX idx_guest_purchases_order_id ON GuestPurchases(order_id);
         CREATE INDEX idx_product_events_product_id ON ProductEvents(product_id);

@@ -321,8 +321,8 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
       }
 
       const insertResult = await query(
-        'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING product_id',
-        [userId, productId],
+        'INSERT INTO BoughtUserProducts (user_id, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING product_id',
+        [userId, productId, orderId],
       );
 
       logger.info('Product purchase verified and recorded', { requestId: req.requestId, userId, productId, orderId });
@@ -435,8 +435,8 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
         let newRows = 0;
         for (const productId of productIds) {
           const result = await query(
-            'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING product_id',
-            [userId, productId],
+            'INSERT INTO BoughtUserProducts (user_id, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING RETURNING product_id',
+            [userId, productId, orderId],
           );
           newRows += result.rows.length;
         }
@@ -558,8 +558,8 @@ async function processVerifiedPayload(payload, requestId) {
     const productId = Number(parts[1]);
     const userId = Number(parts[2]);
     await query(
-      'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [userId, productId],
+      'INSERT INTO BoughtUserProducts (user_id, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+      [userId, productId, liqpayOrderId],
     );
     logger.info('Product purchase recorded', { requestId, productId, userId, liqpayOrderId });
 
@@ -648,8 +648,8 @@ async function processVerifiedPayload(payload, requestId) {
       const userId = Number(parts[2]);
       for (const productId of productIds) {
         await query(
-          'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-          [userId, productId],
+          'INSERT INTO BoughtUserProducts (user_id, product_id, order_id) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+          [userId, productId, liqpayOrderId],
         );
       }
       logger.info('Cart purchase recorded', { requestId, productIds, userId, liqpayOrderId });

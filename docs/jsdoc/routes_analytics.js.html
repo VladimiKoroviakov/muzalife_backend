@@ -161,10 +161,13 @@ router.get('/stats/:productId', async (req, res) => {
       `, [parsedId, startDate, endDate]),
 
       pool.query(`
-        SELECT COUNT(*) AS count FROM BoughtUserProducts
-        WHERE product_id = $1
-          AND bought_at >= $2
-          AND bought_at &lt;= $3
+        SELECT COUNT(*) AS count FROM (
+          SELECT bought_at FROM BoughtUserProducts
+          WHERE product_id = $1 AND bought_at >= $2 AND bought_at &lt;= $3
+          UNION ALL
+          SELECT bought_at FROM GuestPurchases
+          WHERE product_id = $1 AND bought_at >= $2 AND bought_at &lt;= $3
+        ) combined
       `, [parsedId, startDate, endDate]),
 
       pool.query(`

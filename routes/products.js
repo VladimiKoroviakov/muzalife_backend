@@ -162,14 +162,13 @@ const transformProduct = (product) => ({
  * Failures are logged as warnings and swallowed — a broken view counter
  * must never degrade the product detail response.
  * @param {number} productId - ID of the product being viewed.
- * @param {number|undefined} userId - Authenticated user ID, or undefined for anonymous.
  * @param {string} requestId - Request correlation ID for log tracing.
  * @returns {void} No return value — errors are swallowed after logging.
  */
-const recordView = (productId, userId, requestId) => {
+const recordView = (productId, requestId) => {
   pool.query(
-    'INSERT INTO ProductViews (product_id, user_id) VALUES ($1, $2)',
-    [productId, userId ?? null],
+    'INSERT INTO ProductViews (product_id) VALUES ($1)',
+    [productId],
   ).catch((err) =>
     logger.warn('Failed to record product view', {
       module: 'routes/products',
@@ -283,7 +282,7 @@ router.get('/:id', async (req, res) => {
   const cached = appCache.get(CACHE_KEY);
   if (cached) {
     res.setHeader('X-Cache', 'HIT');
-    recordView(productId, req.userId, req.requestId);
+    recordView(productId, req.requestId);
     return res.json(cached);
   }
 
@@ -299,7 +298,7 @@ router.get('/:id', async (req, res) => {
     const product = transformProduct(result.rows[0]);
     appCache.set(CACHE_KEY, product, TTL_PRODUCT_SINGLE);
 
-    recordView(productId, req.userId, req.requestId);
+    recordView(productId, req.requestId);
     res.json(product);
   } catch (error) {
     logger.error('Error fetching product', {
