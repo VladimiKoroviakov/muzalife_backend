@@ -348,12 +348,41 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
         throw new ForbiddenError('Order does not belong to this user', { orderId, userId });
       }
 
-      await query(
-        'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      const insertResult = await query(
+        'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING product_id',
         [userId, productId],
       );
 
       logger.info('Product purchase verified and recorded', { requestId: req.requestId, userId, productId, orderId });
+
+      if (insertResult.rows.length > 0) {
+        try {
+          const [userResult, productTitleResult, filesResult] = await Promise.all([
+            query('SELECT user_email FROM Users WHERE user_id = $1', [userId]),
+            query('SELECT product_title FROM Products WHERE product_id = $1', [productId]),
+            query(
+              `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+                 FROM Files f
+                 JOIN ProductFiles pf ON pf.file_id = f.file_id
+                WHERE pf.product_id = $1
+                ORDER BY f.file_id`,
+              [productId],
+            ),
+          ]);
+          const userEmail = userResult.rows[0]?.user_email;
+          if (userEmail &amp;&amp; filesResult.rows.length > 0) {
+            await emailService.sendProductMaterials(
+              userEmail,
+              productTitleResult.rows[0]?.product_title ?? '',
+              filesResult.rows,
+            );
+          }
+        } catch (emailErr) {
+          logger.warn('Could not send product materials email (verify fallback)', {
+            requestId: req.requestId, userId, productId, error: emailErr.message,
+          });
+        }
+      }
     } else if (orderId.startsWith('cart_')) {
       // Detect guest cart order: cart_{ids}_guest_{base64email}_{timestamp}
       const parts = orderId.split('_');
@@ -431,21 +460,61 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
           throw new ForbiddenError('Order does not belong to this user', { orderId, userId });
         }
 
+        let newRows = 0;
         for (const productId of productIds) {
-          await query(
-            'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          const result = await query(
+            'INSERT INTO BoughtUserProducts (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING product_id',
             [userId, productId],
           );
+          newRows += result.rows.length;
         }
 
         logger.info('Cart purchase verified and recorded', { requestId: req.requestId, userId, productIds, orderId });
+
+        if (newRows > 0) {
+          try {
+            const [userResult, productsResult, filesResult] = await Promise.all([
+              query('SELECT user_email FROM Users WHERE user_id = $1', [userId]),
+              query(
+                'SELECT product_id, product_title FROM Products WHERE product_id = ANY($1::int[])',
+                [productIds],
+              ),
+              query(
+                `SELECT pf.product_id AS "productId", f.file_name AS "fileName", f.file_url AS "fileUrl"
+                   FROM Files f
+                   JOIN ProductFiles pf ON pf.file_id = f.file_id
+                  WHERE pf.product_id = ANY($1::int[])
+                  ORDER BY pf.product_id, f.file_id`,
+                [productIds],
+              ),
+            ]);
+            const userEmail = userResult.rows[0]?.user_email;
+            if (userEmail) {
+              const filesByProduct = {};
+              for (const row of filesResult.rows) {
+                if (!filesByProduct[row.productId]) { filesByProduct[row.productId] = []; }
+                filesByProduct[row.productId].push({ fileName: row.fileName, fileUrl: row.fileUrl });
+              }
+              for (const product of productsResult.rows) {
+                const files = filesByProduct[product.product_id];
+                if (files?.length) {
+                  await emailService.sendProductMaterials(userEmail, product.product_title, files);
+                }
+              }
+            }
+          } catch (emailErr) {
+            logger.warn('Could not send cart materials email (verify fallback, auth user)', {
+              requestId: req.requestId, userId, productIds, error: emailErr.message,
+            });
+          }
+        }
       }
     } else if (orderId.startsWith('personalorder_')) {
       // Format: personalorder_{orderId}
       const personalOrderId = Number(orderId.replace('personalorder_', ''));
 
       const orderResult = await query(
-        'SELECT user_id FROM PersonalOrders WHERE order_id = $1',
+        'SELECT user_id, order_status FROM PersonalOrders WHERE order_id = $1',
         [personalOrderId],
       );
 
@@ -453,12 +522,44 @@ router.post('/verify', authenticateAnyToken, async (req, res, next) => {
         throw new ForbiddenError('Order does not belong to this user', { personalOrderId, userId });
       }
 
+      const alreadyPaid = orderResult.rows[0].order_status === 'paid';
+
       await query(
         'UPDATE PersonalOrders SET order_status = $1 WHERE order_id = $2',
         ['paid', personalOrderId],
       );
 
       logger.info('Personal order verified and marked paid', { requestId: req.requestId, userId, personalOrderId, orderId });
+
+      if (!alreadyPaid) {
+        try {
+          const [orderDataResult, filesResult] = await Promise.all([
+            query(
+              `SELECT po.order_title, u.user_email
+                 FROM PersonalOrders po
+                 JOIN Users u ON u.user_id = po.user_id
+                WHERE po.order_id = $1`,
+              [personalOrderId],
+            ),
+            query(
+              `SELECT f.file_name AS "fileName", f.file_url AS "fileUrl"
+                 FROM Files f
+                 JOIN PersonalOrderFiles pof ON pof.file_id = f.file_id
+                WHERE pof.order_id = $1
+                ORDER BY f.file_id`,
+              [personalOrderId],
+            ),
+          ]);
+          const { order_title, user_email } = orderDataResult.rows[0] ?? {};
+          if (user_email &amp;&amp; filesResult.rows.length > 0) {
+            await emailService.sendOrderMaterials(user_email, order_title, filesResult.rows);
+          }
+        } catch (emailErr) {
+          logger.warn('Could not send personal order materials email (verify fallback)', {
+            requestId: req.requestId, userId, personalOrderId, error: emailErr.message,
+          });
+        }
+      }
     } else {
       throw new ValidationError('Unrecognised orderId format', { orderId });
     }
@@ -833,7 +934,7 @@ export default router;
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-controllers_guestController.html">controllers/guestController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_analytics.html">routes/analytics</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_facebookAdmin.html">routes/facebookAdmin</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_payments.html">routes/payments</a></li><li><a href="module-routes_personalOrders.html">routes/personalOrders</a></li><li><a href="module-routes_polls.html">routes/polls</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_liqpayService.html">services/liqpayService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getLookupData">getLookupData</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-controllers_guestController.html">controllers/guestController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_analytics.html">routes/analytics</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_facebookAdmin.html">routes/facebookAdmin</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_payments.html">routes/payments</a></li><li><a href="module-routes_personalOrders.html">routes/personalOrders</a></li><li><a href="module-routes_polls.html">routes/polls</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_liqpayService.html">services/liqpayService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#EXT_TO_MIME">EXT_TO_MIME</a></li><li><a href="global.html#applyWatermark">applyWatermark</a></li><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getLookupData">getLookupData</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li><li><a href="global.html#watermarkArchiveEntry">watermarkArchiveEntry</a></li><li><a href="global.html#watermarkDocx">watermarkDocx</a></li><li><a href="global.html#watermarkImage">watermarkImage</a></li><li><a href="global.html#watermarkPdf">watermarkPdf</a></li><li><a href="global.html#watermarkPptx">watermarkPptx</a></li><li><a href="global.html#watermarkRar">watermarkRar</a></li><li><a href="global.html#watermarkZip">watermarkZip</a></li></ul>
 </nav>
 
 <br class="clear">

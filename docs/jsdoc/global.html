@@ -98,6 +98,68 @@
 
         
             
+<h4 class="name" id="EXT_TO_MIME"><span class="type-signature">(constant) </span>EXT_TO_MIME<span class="type-signature"></span></h4>
+
+
+
+
+<div class="description">
+    <p>Map file extensions (lower-case, with dot) to MIME types used for dispatch.</p>
+</div>
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line33">line 33</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+        
+            
 <h4 class="name" id="changePassword"><span class="type-signature">(constant) </span>changePassword<span class="type-signature"></span></h4>
 
 
@@ -728,6 +790,186 @@
     
 
     
+    <h4 class="name" id="applyWatermark"><span class="type-signature"></span>applyWatermark<span class="signature">(filePath, mimetype)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Applies the Muzalife watermark to a file based on its MIME type.
+Images, PDFs, Office documents, and archives are processed in-place;
+all other types are no-ops.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the file on disk.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>mimetype</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>MIME type reported by multer (e.g. 'image/jpeg').</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line369">line 369</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
     <h4 class="name" id="getLookupData"><span class="type-signature">(async) </span>getLookupData<span class="signature">(req, res, key, query)</span><span class="type-signature"></span></h4>
     
 
@@ -919,6 +1161,1121 @@
 
 
         
+            
+
+    
+
+    
+    <h4 class="name" id="watermarkArchiveEntry"><span class="type-signature">(async) </span>watermarkArchiveEntry<span class="signature">(tmpPath, ext)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Dispatches watermarking for a single file extracted from an archive.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>tmpPath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the temporary extracted file.</p></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>ext</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Lower-case file extension including the dot.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line287">line 287</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="watermarkDocx"><span class="type-signature">(async) </span>watermarkDocx<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Injects the Muzalife logo into a DOCX file as an inline image at the end of
+the document body (right-aligned paragraph).  Uses OOXML string injection —
+no external XML library required.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the DOCX file on disk.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line110">line 110</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="watermarkImage"><span class="type-signature">(async) </span>watermarkImage<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Composites the Muzalife logo onto a JPEG or PNG image file (bottom-right).
+The logo is scaled to ~15 % of the image width, clamped between 40–120 px.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the image file on disk.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line50">line 50</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="watermarkPdf"><span class="type-signature">(async) </span>watermarkPdf<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Embeds the Muzalife logo on every page of a PDF file (bottom-right, 70 % opacity).</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the PDF file on disk.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line80">line 80</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="watermarkPptx"><span class="type-signature">(async) </span>watermarkPptx<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Injects the Muzalife logo onto every slide of a PPTX file (bottom-right).
+Uses OOXML string injection into each slide's XML.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the PPTX file on disk.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line205">line 205</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="watermarkRar"><span class="type-signature">(async) </span>watermarkRar<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Extracts every entry from a RAR archive using WebAssembly unrar, watermarks
+each known file type, and repacks the contents as a ZIP written to the
+original file path (keeping the .rar extension, ZIP bytes inside).</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the RAR file on disk.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line330">line 330</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="watermarkZip"><span class="type-signature">(async) </span>watermarkZip<span class="signature">(filePath)</span><span class="type-signature"> &rarr; {Promise.&lt;void>}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    <p>Extracts every entry from a ZIP archive, watermarks each known file type,
+and repacks the archive in-place.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"><p>Absolute path to the ZIP file on disk.</p></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="utils_watermark.js.html">utils/watermark.js</a>, <a href="utils_watermark.js.html#line302">line 302</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise.&lt;void></span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+
+        
     
 
     
@@ -934,7 +2291,7 @@
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-controllers_guestController.html">controllers/guestController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_analytics.html">routes/analytics</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_facebookAdmin.html">routes/facebookAdmin</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_payments.html">routes/payments</a></li><li><a href="module-routes_personalOrders.html">routes/personalOrders</a></li><li><a href="module-routes_polls.html">routes/polls</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_liqpayService.html">services/liqpayService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getLookupData">getLookupData</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-config_database.html">config/database</a></li><li><a href="module-controllers_authController.html">controllers/authController</a></li><li><a href="module-controllers_guestController.html">controllers/guestController</a></li><li><a href="module-middleware_auth.html">middleware/auth</a></li><li><a href="module-middleware_errorHandler.html">middleware/errorHandler</a></li><li><a href="module-middleware_performanceMonitor.html">middleware/performanceMonitor</a></li><li><a href="module-middleware_requestLogger.html">middleware/requestLogger</a></li><li><a href="module-routes_analytics.html">routes/analytics</a></li><li><a href="module-routes_apm.html">routes/apm</a></li><li><a href="module-routes_clientErrors.html">routes/clientErrors</a></li><li><a href="module-routes_facebookAdmin.html">routes/facebookAdmin</a></li><li><a href="module-routes_faqs.html">routes/faqs</a></li><li><a href="module-routes_payments.html">routes/payments</a></li><li><a href="module-routes_personalOrders.html">routes/personalOrders</a></li><li><a href="module-routes_polls.html">routes/polls</a></li><li><a href="module-routes_products.html">routes/products</a></li><li><a href="module-server.html">server</a></li><li><a href="module-services_emailService.html">services/emailService</a></li><li><a href="module-services_liqpayService.html">services/liqpayService</a></li><li><a href="module-services_verificationService.html">services/verificationService</a></li><li><a href="module-utils_AppError.html">utils/AppError</a></li><li><a href="module-utils_cache.html">utils/cache</a></li><li><a href="module-utils_jwt.html">utils/jwt</a></li><li><a href="module-utils_logger.html">utils/logger</a></li><li><a href="module-utils_urlHelper.html">utils/urlHelper</a></li></ul><h3>Classes</h3><ul><li><a href="module-services_emailService-EmailService.html">services/emailService~EmailService</a></li><li><a href="module-services_verificationService-VerificationService.html">services/verificationService~VerificationService</a></li><li><a href="module-utils_AppError.AppError.html">utils/AppError.AppError</a></li><li><a href="module-utils_AppError.ConflictError.html">utils/AppError.ConflictError</a></li><li><a href="module-utils_AppError.ExternalServiceError.html">utils/AppError.ExternalServiceError</a></li><li><a href="module-utils_AppError.ForbiddenError.html">utils/AppError.ForbiddenError</a></li><li><a href="module-utils_AppError.InternalError.html">utils/AppError.InternalError</a></li><li><a href="module-utils_AppError.NotFoundError.html">utils/AppError.NotFoundError</a></li><li><a href="module-utils_AppError.RateLimitError.html">utils/AppError.RateLimitError</a></li><li><a href="module-utils_AppError.ServiceUnavailableError.html">utils/AppError.ServiceUnavailableError</a></li><li><a href="module-utils_AppError.UnauthorizedError.html">utils/AppError.UnauthorizedError</a></li><li><a href="module-utils_AppError.UnprocessableError.html">utils/AppError.UnprocessableError</a></li><li><a href="module-utils_AppError.ValidationError.html">utils/AppError.ValidationError</a></li><li><a href="module-utils_cache-Cache.html">utils/cache~Cache</a></li></ul><h3>Global</h3><ul><li><a href="global.html#EXT_TO_MIME">EXT_TO_MIME</a></li><li><a href="global.html#applyWatermark">applyWatermark</a></li><li><a href="global.html#changePassword">changePassword</a></li><li><a href="global.html#deleteAccount">deleteAccount</a></li><li><a href="global.html#getLookupData">getLookupData</a></li><li><a href="global.html#getProfile">getProfile</a></li><li><a href="global.html#initiateEmailChange">initiateEmailChange</a></li><li><a href="global.html#removeProfileImage">removeProfileImage</a></li><li><a href="global.html#resendEmailChangeCode">resendEmailChangeCode</a></li><li><a href="global.html#resendMaterial">resendMaterial</a></li><li><a href="global.html#updateName">updateName</a></li><li><a href="global.html#uploadProfileImage">uploadProfileImage</a></li><li><a href="global.html#verifyEmailChange">verifyEmailChange</a></li><li><a href="global.html#watermarkArchiveEntry">watermarkArchiveEntry</a></li><li><a href="global.html#watermarkDocx">watermarkDocx</a></li><li><a href="global.html#watermarkImage">watermarkImage</a></li><li><a href="global.html#watermarkPdf">watermarkPdf</a></li><li><a href="global.html#watermarkPptx">watermarkPptx</a></li><li><a href="global.html#watermarkRar">watermarkRar</a></li><li><a href="global.html#watermarkZip">watermarkZip</a></li></ul>
 </nav>
 
 <br class="clear">
