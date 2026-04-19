@@ -443,11 +443,12 @@ router.post('/', authenticateToken, (req, res, next) => {
           });
         }
 
+        const fileName = Buffer.from(file.originalname, 'latin1').toString('utf8');
         const fileResult = await client.query(`
           INSERT INTO Files (file_name, file_url, file_size)
           VALUES ($1, $2, $3)
           RETURNING file_id
-        `, [file.originalname, fileUrl, file.size]);
+        `, [fileName, fileUrl, file.size]);
 
         await client.query(
           'INSERT INTO ProductFiles (file_id, product_id) VALUES ($1, $2)',
@@ -796,10 +797,11 @@ router.put('/:id', authenticateToken, (req, res, next) => {
             error: wmErr.message,
           });
         }
+        const fileName = Buffer.from(file.originalname, 'latin1').toString('utf8');
         const fRow = await client.query(
           `INSERT INTO Files (file_name, file_url, file_size)
            VALUES ($1, $2, $3) RETURNING file_id`,
-          [file.originalname, fileUrl, file.size]
+          [fileName, fileUrl, file.size]
         );
 
         await client.query(

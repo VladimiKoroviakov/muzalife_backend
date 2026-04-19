@@ -382,11 +382,12 @@ router.post('/:orderId/files', (req, res, next) => {
           error: wmErr.message,
         });
       }
+      const fileName = Buffer.from(file.originalname, 'latin1').toString('utf8');
       const fileResult = await client.query(`
         INSERT INTO Files (file_name, file_url, file_size)
         VALUES ($1, $2, $3)
         RETURNING file_id AS "fileId", file_name AS "fileName", file_url AS "fileUrl", file_size AS "fileSize"
-      `, [file.originalname, fileUrl, file.size]);
+      `, [fileName, fileUrl, file.size]);
 
       const inserted = fileResult.rows[0];
       await client.query(
