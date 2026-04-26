@@ -53,13 +53,20 @@
 <h2>Features</h2>
 <ul>
 <li>Express.js for fast and flexible REST API development</li>
-<li>Modular architecture for scalable services and routes</li>
+<li>Modular architecture with 15 route modules, controllers, and services</li>
 <li>Environment-based configuration for easy deployment</li>
-<li>JWT Authentication &amp; OAuth (Google, Facebook)</li>
-<li>Database integration (PostgreSQL)</li>
+<li>JWT authentication &amp; OAuth (Google, Facebook) + guest checkout tokens</li>
+<li>Two-step email OTP registration (6-digit code, 15 min TTL)</li>
+<li>Database integration (PostgreSQL 15+, port 5433 in dev)</li>
+<li>LiqPay payment integration with server-to-server webhook</li>
+<li>File delivery system with automatic watermarking (PDF, DOCX, PPTX, images, ZIP/RAR)</li>
 <li>HTTPS-only server (self-signed certs for local development)</li>
-<li>Swagger UI for interactive API documentation</li>
-<li>Structured logging and error handling</li>
+<li>Swagger UI for interactive API documentation at <code>/api/docs</code></li>
+<li>In-memory TTL cache for products, FAQs, and metadata</li>
+<li>Application Performance Monitoring (APM) via <code>/api/apm/stats</code></li>
+<li>Admin panel: product &amp; user management, Facebook posting, analytics</li>
+<li>Structured logging (Winston) with per-request correlation IDs</li>
+<li>Living-documentation tests (<code>tests/docs/</code>) enforced in CI</li>
 </ul>
 <h2>Getting Started</h2>
 <p>Follow these steps to run the backend locally from a <strong>fresh OS installation</strong>.</p>
@@ -126,7 +133,7 @@ PORT=5001
 
 # Database
 DB_HOST=localhost
-DB_PORT=5432
+DB_PORT=5433
 DB_NAME=muzalife
 DB_USER=postgres
 DB_PASSWORD=your_db_password_here
@@ -149,6 +156,11 @@ SMTP_SECURE=false
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password_here
 EMAIL_FROM=&quot;Muza Life&quot; &lt;noreply@muzalife.com>
+
+# Optional
+LOG_LEVEL=info            # debug | info | warn | error (default: info)
+NODE_ENV=development
+JWT_EXPIRES_IN=7d         # default: 7d
 
 # OAuth
 FACEBOOK_APP_ID=your_facebook_app_id_here
@@ -239,22 +251,60 @@ Uploads directory created: .../uploads/products
 </table>
 <h2>Project Structure</h2>
 <pre class="prettyprint source"><code>/
-├── certs/         # HTTPS certificates (not committed to git)
-├── config/        # App configuration (DB connection, Multer)
-├── controllers/   # Request handlers for each route group
-├── docs/          # Project documentation (API spec, deployment guides)
-│   ├── api/       # OpenAPI 3.0 spec (openapi.yaml)
-│   ├── jsdoc/     # Auto-generated JSDoc HTML reference
+├── certs/             # HTTPS certificates (not committed to git)
+├── config/
+│   ├── database.js    # PostgreSQL connection pool (singleton)
+│   └── multer.js      # File upload config (50 MB limit)
+├── controllers/       # Request handlers (business logic + DB queries)
+├── docs/              # Project documentation
+│   ├── api/           # OpenAPI 3.0 spec (openapi.yaml)
+│   ├── jsdoc/         # Auto-generated JSDoc HTML reference
+│   ├── i18n/          # Docs in Ukrainian and English
+│   ├── scripts/       # Shell scripts (backup, start-dev, start-prod)
 │   ├── deployment.md
 │   ├── update.md
-│   └── backup.md
-├── middleware/    # Express middlewares (auth, file uploads)
-├── routes/        # API route definitions
-├── scripts/       # Utility scripts (DB setup)
-├── services/      # Business logic & integrations (email, verification)
-├── uploads/       # User-uploaded files (not committed to git)
-├── utils/         # Utility functions (JWT, URL helpers)
-└── server.js      # Application entry point
+│   ├── backup.md
+│   ├── performance.md
+│   ├── linting.md
+│   └── generate_docs.md
+├── docs-site/         # VitePress documentation site (GitHub Pages)
+├── logs/              # Winston log files (not committed to git)
+├── middleware/
+│   ├── auth.js        # JWT verification (user, guest, any)
+│   ├── errorHandler.js
+│   ├── performanceMonitor.js
+│   └── requestLogger.js
+├── routes/            # 15 API route modules
+│   ├── auth.js        # /auth — registration, login, OAuth
+│   ├── users.js       # /users — profile, password, email change
+│   ├── products.js    # /products — catalogue, CRUD (admin)
+│   ├── savedProducts.js    # /saved-products
+│   ├── boughtProducts.js   # /bought-products
+│   ├── reviews.js     # /reviews
+│   ├── faqs.js        # /faqs
+│   ├── polls.js       # /polls
+│   ├── personalOrders.js   # /personal-orders
+│   ├── payments.js    # /payments — LiqPay integration
+│   ├── analytics.js   # /analytics — admin stats
+│   ├── metadata.js    # /metadata — types, age categories, events
+│   ├── apm.js         # /apm — performance monitoring
+│   ├── clientErrors.js     # /errors/client — frontend error logging
+│   └── facebookAdmin.js    # /admin — Facebook posting (admin)
+├── scripts/
+│   └── setupDatabase.js    # DB schema initialisation
+├── services/          # External integrations (email, OAuth, payments)
+├── tests/
+│   └── docs/          # Living-documentation tests (Vitest)
+├── uploads/           # User-uploaded files (not committed to git)
+├── utils/
+│   ├── AppError.js    # Custom error classes (400–502)
+│   ├── cache.js       # In-memory TTL cache
+│   ├── jwt.js         # Token generation and verification
+│   ├── logger.js      # Winston logger wrapper
+│   ├── urlHelper.js   # Relative → absolute URL construction
+│   └── watermark.js   # File watermarking (PDF, DOCX, PPTX, images)
+├── .claude/           # Claude Code project context files
+└── server.js          # Application entry point
 </code></pre>
 <h2>NPM Scripts Reference</h2>
 <table>
@@ -279,19 +329,27 @@ Uploads directory created: .../uploads/products
 </tr>
 <tr>
 <td><code>npm test</code></td>
-<td>Run all unit tests (Vitest)</td>
+<td>Run all Vitest tests</td>
+</tr>
+<tr>
+<td><code>npm run test:docs</code></td>
+<td>Run living-documentation tests only (<code>tests/docs/</code>)</td>
 </tr>
 <tr>
 <td><code>npm run test:coverage</code></td>
-<td>Run tests with coverage report</td>
+<td>Run tests with v8 coverage report</td>
 </tr>
 <tr>
 <td><code>npm run lint</code></td>
-<td>Run ESLint</td>
+<td>Run ESLint check</td>
 </tr>
 <tr>
 <td><code>npm run lint:fix</code></td>
-<td>Run ESLint and auto-fix</td>
+<td>Run ESLint with auto-fix</td>
+</tr>
+<tr>
+<td><code>npm run lint:docs</code></td>
+<td>Check JSDoc coverage with ESLint</td>
 </tr>
 <tr>
 <td><code>npm run docs</code></td>
@@ -302,8 +360,16 @@ Uploads directory created: .../uploads/products
 <td>Clean and regenerate JSDoc</td>
 </tr>
 <tr>
+<td><code>npm run docs:archive</code></td>
+<td>Create <code>docs/jsdoc.zip</code> archive</td>
+</tr>
+<tr>
+<td><code>npm run docs:site</code></td>
+<td>Serve VitePress docs site locally</td>
+</tr>
+<tr>
 <td><code>npm run check</code></td>
-<td>Run lint + doc tests (used by CI)</td>
+<td>Run lint + test:docs (CI gate)</td>
 </tr>
 </tbody>
 </table>
@@ -331,7 +397,7 @@ Uploads directory created: .../uploads/products
 <tr>
 <td><code>DB_PORT</code></td>
 <td>Yes</td>
-<td>PostgreSQL port (default: 5432)</td>
+<td>PostgreSQL port (<strong>5433</strong> in dev, not 5432)</td>
 </tr>
 <tr>
 <td><code>DB_NAME</code></td>
@@ -351,17 +417,22 @@ Uploads directory created: .../uploads/products
 <tr>
 <td><code>JWT_SECRET</code></td>
 <td>Yes</td>
-<td>Secret for signing JWT tokens (min 32 chars)</td>
+<td>Secret for signing JWT tokens (min 64 hex chars)</td>
+</tr>
+<tr>
+<td><code>JWT_EXPIRES_IN</code></td>
+<td>No</td>
+<td>JWT lifetime (default: <code>7d</code>)</td>
 </tr>
 <tr>
 <td><code>FRONTEND_URL</code></td>
 <td>Yes</td>
-<td>Frontend origin (for CORS)</td>
+<td>Frontend origin for CORS (e.g. <code>https://localhost:3000</code>)</td>
 </tr>
 <tr>
 <td><code>BACKEND_URL</code></td>
 <td>Yes</td>
-<td>Backend base URL</td>
+<td>Backend base URL (e.g. <code>https://localhost:5001</code>)</td>
 </tr>
 <tr>
 <td><code>SMTP_HOST</code></td>
@@ -371,7 +442,12 @@ Uploads directory created: .../uploads/products
 <tr>
 <td><code>SMTP_PORT</code></td>
 <td>Yes</td>
-<td>SMTP port</td>
+<td>SMTP port (typically 587)</td>
+</tr>
+<tr>
+<td><code>SMTP_SECURE</code></td>
+<td>Yes</td>
+<td><code>false</code> for STARTTLS, <code>true</code> for SSL/465</td>
 </tr>
 <tr>
 <td><code>SMTP_USER</code></td>
@@ -386,7 +462,7 @@ Uploads directory created: .../uploads/products
 <tr>
 <td><code>EMAIL_FROM</code></td>
 <td>Yes</td>
-<td>Sender name and address</td>
+<td>Sender display name and address</td>
 </tr>
 <tr>
 <td><code>FACEBOOK_APP_ID</code></td>
@@ -407,6 +483,16 @@ Uploads directory created: .../uploads/products
 <td><code>LIQPAY_PRIVATE_KEY</code></td>
 <td>No</td>
 <td>LiqPay payment private key</td>
+</tr>
+<tr>
+<td><code>LOG_LEVEL</code></td>
+<td>No</td>
+<td>Winston log level: <code>debug</code>, <code>info</code>, <code>warn</code>, <code>error</code> (default: <code>info</code>)</td>
+</tr>
+<tr>
+<td><code>NODE_ENV</code></td>
+<td>No</td>
+<td><code>development</code> or <code>production</code></td>
 </tr>
 </tbody>
 </table>
