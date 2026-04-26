@@ -60,9 +60,11 @@ export default defineConfig({
           {
             text: 'API Reference',
             items: [
-              { text: 'Overview',        link: '/en/api/overview' },
-              { text: 'Auth',            link: '/en/api/auth' },
-              { text: 'Products',        link: '/en/api/products' },
+              { text: 'Overview',          link: '/en/api/overview' },
+              { text: 'Auth',              link: '/en/api/auth' },
+              { text: 'Products',          link: '/en/api/products' },
+              { text: 'Payments',          link: '/en/api/payments' },
+              { text: 'Personal Orders',   link: '/en/api/personal-orders' },
             ],
           },
         ],
@@ -91,9 +93,11 @@ export default defineConfig({
       {
         text: 'API довідник',
         items: [
-          { text: 'Огляд',           link: '/api/overview' },
-          { text: 'Auth',            link: '/api/auth' },
-          { text: 'Продукти',        link: '/api/products' },
+          { text: 'Огляд',                    link: '/api/overview' },
+          { text: 'Auth',                     link: '/api/auth' },
+          { text: 'Продукти',                 link: '/api/products' },
+          { text: 'Платежі',                  link: '/api/payments' },
+          { text: 'Персональні замовлення',   link: '/api/personal-orders' },
         ],
       },
     ],

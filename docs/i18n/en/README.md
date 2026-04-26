@@ -30,19 +30,28 @@
 
 ```
 MuzaLife Backend/
+├── certs/             — HTTPS certificates (not committed)
 ├── config/
-│   └── database.js       — PostgreSQL connection pool (singleton)
-├── controllers/
-│   └── authController.js — two-step registration, login, OAuth
+│   ├── database.js    — PostgreSQL connection pool (singleton)
+│   └── multer.js      — file upload config (50 MB limit)
+├── controllers/       — request handlers (business logic + DB queries)
 ├── middleware/
-│   └── auth.js           — JWT Bearer token verification
-├── routes/               — Express route definitions
-├── services/
-│   ├── emailService.js   — Nodemailer singleton transporter
-│   └── verificationService.js — OTP lifecycle management
+│   ├── auth.js        — JWT verification (user, guest, any)
+│   ├── errorHandler.js
+│   ├── performanceMonitor.js
+│   └── requestLogger.js
+├── routes/            — 15 Express route modules
+├── services/          — external integrations (email, OAuth, LiqPay)
 ├── utils/
-│   ├── jwt.js            — token generation and verification
-│   └── urlHelper.js      — relative paths → absolute URLs
+│   ├── AppError.js    — custom error classes (400–502)
+│   ├── cache.js       — in-memory TTL cache
+│   ├── jwt.js         — token generation and verification
+│   ├── logger.js      — Winston logger wrapper
+│   ├── urlHelper.js   — relative → absolute URL construction
+│   └── watermark.js   — file watermarking (PDF, DOCX, PPTX, images)
+├── scripts/
+│   └── setupDatabase.js
+├── tests/docs/        — living documentation tests
 └── docs/
     ├── api/openapi.yaml  — OpenAPI 3.0 specification
     ├── jsdoc/            — HTML reference (auto-generated)
@@ -56,7 +65,7 @@ MuzaLife Backend/
 
 ### Two-step Email Registration
 
-1. `POST /api/auth/register/initiate` — sends a 6-digit OTP to the email
+1. `POST /api/auth/register/initiate` — sends a 6-digit OTP to the email (15 min TTL)
 2. `POST /api/auth/register/verify` — validates OTP, creates user, returns JWT
 
 ### JWT
@@ -71,6 +80,12 @@ MuzaLife Backend/
 - Google: `POST /api/auth/google` with a Google Access Token
 - Facebook: `POST /api/auth/facebook` with a Facebook Access Token
 
+### Guest Tokens
+
+- `POST /api/auth/guest/verify/initiate` — initiate guest email verification
+- `POST /api/auth/guest/verify/confirm` — confirm guest email, returns guest JWT
+- Guest JWT is accepted by payment endpoints via `authenticateAnyToken`
+
 ---
 
 ## API Overview
@@ -81,6 +96,24 @@ Interactive docs: [Swagger UI](https://localhost:5001/api/docs)
 
 Full spec: `docs/api/openapi.yaml`
 
+| Group | Prefix | Auth |
+|-------|--------|------|
+| Auth | `/auth` | Public |
+| Users | `/users` | JWT |
+| Products | `/products` | GET public; mutations — admin |
+| Saved Products | `/saved-products` | JWT |
+| Bought Products | `/bought-products` | JWT |
+| Reviews | `/reviews` | Read public; write — JWT |
+| FAQs | `/faqs` | Public |
+| Polls | `/polls` | Voting — JWT |
+| Personal Orders | `/personal-orders` | JWT (owner or admin) |
+| Payments | `/payments` | JWT or guest token |
+| Analytics | `/analytics` | JWT + Admin |
+| Metadata | `/metadata` | Public (cached 1 h) |
+| APM | `/apm` | Public |
+| Client Errors | `/errors/client` | Public |
+| Facebook Admin | `/admin` | JWT + Admin |
+
 ---
 
 ## Tooling
@@ -89,6 +122,7 @@ Full spec: `docs/api/openapi.yaml`
 npm run docs            # generate JSDoc HTML → docs/jsdoc/
 npm run docs:clean      # clean and regenerate
 npm run docs:archive    # create docs/jsdoc.zip
+npm run docs:site       # serve VitePress docs locally
 npm run lint:docs       # check JSDoc coverage with ESLint
 npm run test:docs       # run living-documentation tests
 ```

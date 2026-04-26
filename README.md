@@ -13,13 +13,20 @@ This repository contains the source code for the server-side of the MuzaLife pro
 ## Features
 
 - Express.js for fast and flexible REST API development
-- Modular architecture for scalable services and routes
+- Modular architecture with 15 route modules, controllers, and services
 - Environment-based configuration for easy deployment
-- JWT Authentication & OAuth (Google, Facebook)
-- Database integration (PostgreSQL)
+- JWT authentication & OAuth (Google, Facebook) + guest checkout tokens
+- Two-step email OTP registration (6-digit code, 15 min TTL)
+- Database integration (PostgreSQL 15+, port 5433 in dev)
+- LiqPay payment integration with server-to-server webhook
+- File delivery system with automatic watermarking (PDF, DOCX, PPTX, images, ZIP/RAR)
 - HTTPS-only server (self-signed certs for local development)
-- Swagger UI for interactive API documentation
-- Structured logging and error handling
+- Swagger UI for interactive API documentation at `/api/docs`
+- In-memory TTL cache for products, FAQs, and metadata
+- Application Performance Monitoring (APM) via `/api/apm/stats`
+- Admin panel: product & user management, Facebook posting, analytics
+- Structured logging (Winston) with per-request correlation IDs
+- Living-documentation tests (`tests/docs/`) enforced in CI
 
 
 ## Getting Started
@@ -71,7 +78,7 @@ PORT=5001
 
 # Database
 DB_HOST=localhost
-DB_PORT=5432
+DB_PORT=5433
 DB_NAME=muzalife
 DB_USER=postgres
 DB_PASSWORD=your_db_password_here
@@ -94,6 +101,11 @@ SMTP_SECURE=false
 SMTP_USER=your_email@gmail.com
 SMTP_PASSWORD=your_app_password_here
 EMAIL_FROM="Muza Life" <noreply@muzalife.com>
+
+# Optional
+LOG_LEVEL=info            # debug | info | warn | error (default: info)
+NODE_ENV=development
+JWT_EXPIRES_IN=7d         # default: 7d
 
 # OAuth
 FACEBOOK_APP_ID=your_facebook_app_id_here
@@ -200,22 +212,60 @@ Open the following endpoints to confirm everything works:
 
 ```
 /
-├── certs/         # HTTPS certificates (not committed to git)
-├── config/        # App configuration (DB connection, Multer)
-├── controllers/   # Request handlers for each route group
-├── docs/          # Project documentation (API spec, deployment guides)
-│   ├── api/       # OpenAPI 3.0 spec (openapi.yaml)
-│   ├── jsdoc/     # Auto-generated JSDoc HTML reference
+├── certs/             # HTTPS certificates (not committed to git)
+├── config/
+│   ├── database.js    # PostgreSQL connection pool (singleton)
+│   └── multer.js      # File upload config (50 MB limit)
+├── controllers/       # Request handlers (business logic + DB queries)
+├── docs/              # Project documentation
+│   ├── api/           # OpenAPI 3.0 spec (openapi.yaml)
+│   ├── jsdoc/         # Auto-generated JSDoc HTML reference
+│   ├── i18n/          # Docs in Ukrainian and English
+│   ├── scripts/       # Shell scripts (backup, start-dev, start-prod)
 │   ├── deployment.md
 │   ├── update.md
-│   └── backup.md
-├── middleware/    # Express middlewares (auth, file uploads)
-├── routes/        # API route definitions
-├── scripts/       # Utility scripts (DB setup)
-├── services/      # Business logic & integrations (email, verification)
-├── uploads/       # User-uploaded files (not committed to git)
-├── utils/         # Utility functions (JWT, URL helpers)
-└── server.js      # Application entry point
+│   ├── backup.md
+│   ├── performance.md
+│   ├── linting.md
+│   └── generate_docs.md
+├── docs-site/         # VitePress documentation site (GitHub Pages)
+├── logs/              # Winston log files (not committed to git)
+├── middleware/
+│   ├── auth.js        # JWT verification (user, guest, any)
+│   ├── errorHandler.js
+│   ├── performanceMonitor.js
+│   └── requestLogger.js
+├── routes/            # 15 API route modules
+│   ├── auth.js        # /auth — registration, login, OAuth
+│   ├── users.js       # /users — profile, password, email change
+│   ├── products.js    # /products — catalogue, CRUD (admin)
+│   ├── savedProducts.js    # /saved-products
+│   ├── boughtProducts.js   # /bought-products
+│   ├── reviews.js     # /reviews
+│   ├── faqs.js        # /faqs
+│   ├── polls.js       # /polls
+│   ├── personalOrders.js   # /personal-orders
+│   ├── payments.js    # /payments — LiqPay integration
+│   ├── analytics.js   # /analytics — admin stats
+│   ├── metadata.js    # /metadata — types, age categories, events
+│   ├── apm.js         # /apm — performance monitoring
+│   ├── clientErrors.js     # /errors/client — frontend error logging
+│   └── facebookAdmin.js    # /admin — Facebook posting (admin)
+├── scripts/
+│   └── setupDatabase.js    # DB schema initialisation
+├── services/          # External integrations (email, OAuth, payments)
+├── tests/
+│   └── docs/          # Living-documentation tests (Vitest)
+├── uploads/           # User-uploaded files (not committed to git)
+├── utils/
+│   ├── AppError.js    # Custom error classes (400–502)
+│   ├── cache.js       # In-memory TTL cache
+│   ├── jwt.js         # Token generation and verification
+│   ├── logger.js      # Winston logger wrapper
+│   ├── urlHelper.js   # Relative → absolute URL construction
+│   └── watermark.js   # File watermarking (PDF, DOCX, PPTX, images)
+├── .claude/           # Claude Code project context files
+└── server.js          # Application entry point
 ```
 
 
@@ -226,13 +276,17 @@ Open the following endpoints to confirm everything works:
 | `npm run dev` | Start development server with hot-reload (nodemon) |
 | `npm start` | Start production server |
 | `npm run setup-db` | Create all database tables and indexes |
-| `npm test` | Run all unit tests (Vitest) |
-| `npm run test:coverage` | Run tests with coverage report |
-| `npm run lint` | Run ESLint |
-| `npm run lint:fix` | Run ESLint and auto-fix |
+| `npm test` | Run all Vitest tests |
+| `npm run test:docs` | Run living-documentation tests only (`tests/docs/`) |
+| `npm run test:coverage` | Run tests with v8 coverage report |
+| `npm run lint` | Run ESLint check |
+| `npm run lint:fix` | Run ESLint with auto-fix |
+| `npm run lint:docs` | Check JSDoc coverage with ESLint |
 | `npm run docs` | Generate JSDoc HTML → `docs/jsdoc/` |
 | `npm run docs:clean` | Clean and regenerate JSDoc |
-| `npm run check` | Run lint + doc tests (used by CI) |
+| `npm run docs:archive` | Create `docs/jsdoc.zip` archive |
+| `npm run docs:site` | Serve VitePress docs site locally |
+| `npm run check` | Run lint + test:docs (CI gate) |
 
 
 ## Configuration
@@ -243,22 +297,26 @@ Open the following endpoints to confirm everything works:
 |---|---|---|
 | `PORT` | No | Server port (default: 5001) |
 | `DB_HOST` | Yes | PostgreSQL host |
-| `DB_PORT` | Yes | PostgreSQL port (default: 5432) |
+| `DB_PORT` | Yes | PostgreSQL port (**5433** in dev, not 5432) |
 | `DB_NAME` | Yes | Database name |
 | `DB_USER` | Yes | Database user |
 | `DB_PASSWORD` | Yes | Database password |
-| `JWT_SECRET` | Yes | Secret for signing JWT tokens (min 32 chars) |
-| `FRONTEND_URL` | Yes | Frontend origin (for CORS) |
-| `BACKEND_URL` | Yes | Backend base URL |
+| `JWT_SECRET` | Yes | Secret for signing JWT tokens (min 64 hex chars) |
+| `JWT_EXPIRES_IN` | No | JWT lifetime (default: `7d`) |
+| `FRONTEND_URL` | Yes | Frontend origin for CORS (e.g. `https://localhost:3000`) |
+| `BACKEND_URL` | Yes | Backend base URL (e.g. `https://localhost:5001`) |
 | `SMTP_HOST` | Yes | SMTP server hostname |
-| `SMTP_PORT` | Yes | SMTP port |
+| `SMTP_PORT` | Yes | SMTP port (typically 587) |
+| `SMTP_SECURE` | Yes | `false` for STARTTLS, `true` for SSL/465 |
 | `SMTP_USER` | Yes | SMTP username/email |
 | `SMTP_PASSWORD` | Yes | SMTP password or App Password |
-| `EMAIL_FROM` | Yes | Sender name and address |
+| `EMAIL_FROM` | Yes | Sender display name and address |
 | `FACEBOOK_APP_ID` | No | Facebook OAuth App ID |
 | `FACEBOOK_APP_SECRET` | No | Facebook OAuth App Secret |
 | `LIQPAY_PUBLIC_KEY` | No | LiqPay payment public key |
 | `LIQPAY_PRIVATE_KEY` | No | LiqPay payment private key |
+| `LOG_LEVEL` | No | Winston log level: `debug`, `info`, `warn`, `error` (default: `info`) |
+| `NODE_ENV` | No | `development` or `production` |
 
 
 ## Documentation

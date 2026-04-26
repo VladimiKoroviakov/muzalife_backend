@@ -30,19 +30,28 @@
 
 ```
 MuzaLife Backend/
+├── certs/             — HTTPS сертифікати (не комітяться)
 ├── config/
-│   └── database.js       — пул з'єднань PostgreSQL (singleton)
-├── controllers/
-│   └── authController.js — двокрокова реєстрація, логін, OAuth
+│   ├── database.js    — пул з'єднань PostgreSQL (singleton)
+│   └── multer.js      — конфігурація завантаження файлів (50 MB)
+├── controllers/       — обробники запитів (бізнес-логіка + запити до БД)
 ├── middleware/
-│   └── auth.js           — перевірка JWT Bearer токена
-├── routes/               — Express маршрути
-├── services/
-│   ├── emailService.js   — Nodemailer singleton транспортер
-│   └── verificationService.js — OTP lifecycle
+│   ├── auth.js        — перевірка JWT (user, guest, any)
+│   ├── errorHandler.js
+│   ├── performanceMonitor.js
+│   └── requestLogger.js
+├── routes/            — 15 модулів маршрутів Express
+├── services/          — зовнішні інтеграції (email, OAuth, LiqPay)
 ├── utils/
-│   ├── jwt.js            — генерація та верифікація токенів
-│   └── urlHelper.js      — відносні шляхи → абсолютні URL
+│   ├── AppError.js    — власні класи помилок (400–502)
+│   ├── cache.js       — in-memory кеш з TTL
+│   ├── jwt.js         — генерація та верифікація токенів
+│   ├── logger.js      — Winston logger wrapper
+│   ├── urlHelper.js   — відносні шляхи → абсолютні URL
+│   └── watermark.js   — водяний знак (PDF, DOCX, PPTX, зображення)
+├── scripts/
+│   └── setupDatabase.js
+├── tests/docs/        — living documentation тести
 └── docs/
     ├── api/openapi.yaml  — OpenAPI 3.0 специфікація
     ├── jsdoc/            — HTML довідник (автогенерація)
@@ -56,7 +65,7 @@ MuzaLife Backend/
 
 ### Двокрокова Email-реєстрація
 
-1. `POST /api/auth/register/initiate` — надсилає 6-значний OTP на email
+1. `POST /api/auth/register/initiate` — надсилає 6-значний OTP на email (TTL 15 хв)
 2. `POST /api/auth/register/verify` — перевіряє OTP, створює користувача, повертає JWT
 
 ### JWT
@@ -71,24 +80,39 @@ MuzaLife Backend/
 - Google: `POST /api/auth/google` з Google Access Token
 - Facebook: `POST /api/auth/facebook` з Facebook Access Token
 
+### Гостьові токени
+
+- `POST /api/auth/guest/verify/initiate` — ініціювати верифікацію гостьового email
+- `POST /api/auth/guest/verify/confirm` — підтвердити email, отримати guest JWT
+- Guest JWT приймається платіжними ендпоінтами через `authenticateAnyToken`
+
 ---
 
 ## API Огляд
 
 Базовий URL: `https://localhost:5001/api`
 
-| Метод | Ендпоінт | Опис |
-|-------|---------|------|
-| GET | /health | Стан сервера |
-| POST | /auth/register/initiate | Крок 1 реєстрації |
-| POST | /auth/register/verify | Крок 2 реєстрації |
-| POST | /auth/login | Вхід |
-| GET | /products | Список продуктів |
-| GET | /reviews | Список відгуків |
-| GET | /faqs | Часті питання |
+Живий Swagger UI: `https://localhost:5001/api/docs`
 
 Повна специфікація: `docs/api/openapi.yaml`
-Живий Swagger UI: `https://localhost:5001/api/docs`
+
+| Група | Префікс | Захист |
+|-------|---------|--------|
+| Auth | `/auth` | Публічно |
+| Users | `/users` | JWT |
+| Products | `/products` | GET публічно; мутації — admin |
+| Saved Products | `/saved-products` | JWT |
+| Bought Products | `/bought-products` | JWT |
+| Reviews | `/reviews` | Читання — публічно; запис — JWT |
+| FAQs | `/faqs` | Публічно |
+| Polls | `/polls` | Голосування — JWT |
+| Personal Orders | `/personal-orders` | JWT (власник або admin) |
+| Payments | `/payments` | JWT або guest token |
+| Analytics | `/analytics` | JWT + Admin |
+| Metadata | `/metadata` | Публічно (кеш 1 год) |
+| APM | `/apm` | Публічно |
+| Client Errors | `/errors/client` | Публічно |
+| Facebook Admin | `/admin` | JWT + Admin |
 
 ---
 
@@ -105,6 +129,9 @@ npm run docs:clean
 
 # Створити архів docs/jsdoc.zip
 npm run docs:archive
+
+# Запустити VitePress docs site локально
+npm run docs:site
 ```
 
 ### Перевірка якості документації
@@ -128,7 +155,7 @@ npm test
 
 ## Внесок у проєкт
 
-1. Кожна нова функція повинна мати JSDoc коментар із `@param`, `@returns`, `@example`
+1. Кожна нова публічна функція повинна мати JSDoc коментар із `@param`, `@returns`, `@example`
 2. Кожен новий модуль повинен мати `@fileoverview`
 3. Нові API ендпоінти додавайте до `docs/api/openapi.yaml`
 4. Для нових утилітів додавайте тест-документацію у `tests/docs/`

@@ -11,6 +11,7 @@ export default [
       'uploads/**',
       'certs/**',
       'dist/**',
+      '**/dist/**',
       'coverage/**',
       'docs/**',
       '**/*.min.js',
