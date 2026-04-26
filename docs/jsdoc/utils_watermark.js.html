@@ -44,6 +44,7 @@ import sharp from 'sharp';
 import { PDFDocument } from 'pdf-lib';
 import AdmZip from 'adm-zip';
 import { createExtractorFromData } from 'node-unrar-js';
+import logger from './logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOGO_PATH = path.join(__dirname, 'assets', 'watermark-logo.png');
@@ -129,94 +130,155 @@ async function watermarkPdf(filePath) {
 // ── DOCX ──────────────────────────────────────────────────────────────────────
 
 /**
- * Injects the Muzalife logo into a DOCX file as an inline image at the end of
- * the document body (right-aligned paragraph).  Uses OOXML string injection —
- * no external XML library required.
+ * Injects the Muzalife logo into a DOCX file as a header-based floating watermark
+ * that appears on every page, behind the text, and is not directly selectable
+ * from the document body.  Uses OOXML string injection — no external XML library.
  * @param {string} filePath - Absolute path to the DOCX file on disk.
  * @returns {Promise&lt;void>}
  */
 async function watermarkDocx(filePath) {
+  // Compute EMUs from actual logo dimensions to preserve aspect ratio.
+  const logoMeta  = await sharp(LOGO_PATH).metadata();
+  const wmCx      = 1828800; // 2 inches — bottom-right corner placement
+  const wmCy      = Math.round(wmCx * (logoMeta.height / logoMeta.width));
+
   const zip = new AdmZip(filePath);
 
-  // 1. Embed logo
+  // Early-exit if already watermarked (idempotency).
+  const existingDoc = zip.getEntry('word/document.xml');
+  if (existingDoc &amp;&amp; existingDoc.getData().toString('utf8').includes('rIdHdr1')) {return;}
+
+  // 1. Embed logo image.
   const logoBytes = fs.readFileSync(LOGO_PATH);
   zip.addFile('word/media/muzalife_wm.png', logoBytes);
 
-  // 2. [Content_Types].xml — add PNG Default if missing
+  // 2. Create word/header1.xml — floating anchor, behind text, centred on margin.
+  const header1Xml =
+    '&lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '&lt;w:hdr' +
+      ' xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"' +
+      ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
+      ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"' +
+      ' xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"' +
+      ' xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"' +
+      ' xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"' +
+      ' mc:Ignorable="w14 wp14">' +
+      '&lt;w:p>' +
+        '&lt;w:pPr>&lt;w:jc w:val="center"/>&lt;/w:pPr>' +
+        '&lt;w:r>' +
+          '&lt;w:drawing>' +
+            '&lt;wp:anchor distT="0" distB="0" distL="0" distR="0"' +
+              ' simplePos="0" relativeHeight="251658240"' +
+              ' behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1">' +
+              '&lt;wp:simplePos x="0" y="0"/>' +
+              '&lt;wp:positionH relativeFrom="margin">&lt;wp:align>right&lt;/wp:align>&lt;/wp:positionH>' +
+              '&lt;wp:positionV relativeFrom="margin">&lt;wp:align>bottom&lt;/wp:align>&lt;/wp:positionV>' +
+              `&lt;wp:extent cx="${wmCx}" cy="${wmCy}"/>` +
+              '&lt;wp:effectExtent l="0" t="0" r="0" b="0"/>' +
+              '&lt;wp:wrapNone/>' +
+              '&lt;wp:docPr id="9901" name="MuzalifeWatermark"/>' +
+              '&lt;wp:cNvGraphicFramePr>' +
+                '&lt;a:graphicFrameLocks' +
+                  ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
+                  ' noChangeAspect="1"/>' +
+              '&lt;/wp:cNvGraphicFramePr>' +
+              '&lt;a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+                '&lt;a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+                  '&lt;pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+                    '&lt;pic:nvPicPr>' +
+                      '&lt;pic:cNvPr id="9900" name="MuzalifeWatermark"/>' +
+                      '&lt;pic:cNvPicPr/>' +
+                    '&lt;/pic:nvPicPr>' +
+                    '&lt;pic:blipFill>' +
+                      '&lt;a:blip r:embed="rIdHdrImg1"/>' +
+                      '&lt;a:stretch>&lt;a:fillRect/>&lt;/a:stretch>' +
+                    '&lt;/pic:blipFill>' +
+                    '&lt;pic:spPr>' +
+                      '&lt;a:xfrm>' +
+                        '&lt;a:off x="0" y="0"/>' +
+                        `&lt;a:ext cx="${wmCx}" cy="${wmCy}"/>` +
+                      '&lt;/a:xfrm>' +
+                      '&lt;a:prstGeom prst="rect">&lt;a:avLst/>&lt;/a:prstGeom>' +
+                    '&lt;/pic:spPr>' +
+                  '&lt;/pic:pic>' +
+                '&lt;/a:graphicData>' +
+              '&lt;/a:graphic>' +
+            '&lt;/wp:anchor>' +
+          '&lt;/w:drawing>' +
+        '&lt;/w:r>' +
+      '&lt;/w:p>' +
+    '&lt;/w:hdr>';
+  zip.addFile('word/header1.xml', Buffer.from(header1Xml, 'utf8'));
+
+  // 3. Create word/_rels/header1.xml.rels — image rel scoped to the header.
+  const header1RelsXml =
+    '&lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '&lt;Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '&lt;Relationship Id="rIdHdrImg1"' +
+        ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"' +
+        ' Target="media/muzalife_wm.png"/>' +
+    '&lt;/Relationships>';
+  zip.addFile('word/_rels/header1.xml.rels', Buffer.from(header1RelsXml, 'utf8'));
+
+  // 4. [Content_Types].xml — PNG Default + header1.xml Override.
   const ctEntry = zip.getEntry('[Content_Types].xml');
   if (ctEntry) {
     let ct = ctEntry.getData().toString('utf8');
     if (!ct.includes('Extension="png"')) {
       ct = ct.replace('&lt;/Types>', '&lt;Default Extension="png" ContentType="image/png"/>&lt;/Types>');
-      zip.updateFile('[Content_Types].xml', Buffer.from(ct, 'utf8'));
     }
+    if (!ct.includes('header1.xml')) {
+      ct = ct.replace(
+        '&lt;/Types>',
+        '&lt;Override PartName="/word/header1.xml"' +
+          ' ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' +
+        '&lt;/Types>',
+      );
+    }
+    zip.updateFile('[Content_Types].xml', Buffer.from(ct, 'utf8'));
   }
 
-  // 3. word/_rels/document.xml.rels — add image relationship
+  // 5. word/_rels/document.xml.rels — add header relationship.
   const relsEntry = zip.getEntry('word/_rels/document.xml.rels');
   if (relsEntry) {
     let rels = relsEntry.getData().toString('utf8');
-    if (!rels.includes('rIdMZWM')) {
+    if (!rels.includes('rIdHdr1')) {
       rels = rels.replace(
         '&lt;/Relationships>',
-        '&lt;Relationship Id="rIdMZWM" ' +
-          'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" ' +
-          'Target="media/muzalife_wm.png"/>' +
+        '&lt;Relationship Id="rIdHdr1"' +
+          ' Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header"' +
+          ' Target="header1.xml"/>' +
         '&lt;/Relationships>',
       );
       zip.updateFile('word/_rels/document.xml.rels', Buffer.from(rels, 'utf8'));
     }
   }
 
-  // 4. word/document.xml — append watermark paragraph before &lt;/w:body>
+  // 6. word/document.xml — remove legacy inline paragraph (if any) and wire
+  //    the header reference into &lt;w:sectPr> so it appears on every page.
   const docEntry = zip.getEntry('word/document.xml');
   if (docEntry) {
     let doc = docEntry.getData().toString('utf8');
-    if (!doc.includes('rIdMZWM')) {
-      const wmParagraph =
-        '&lt;w:p>' +
-          '&lt;w:pPr>&lt;w:jc w:val="right"/>&lt;/w:pPr>' +
-          '&lt;w:r>' +
-            '&lt;w:drawing>' +
-              '&lt;wp:inline distT="0" distB="0" distL="0" distR="0"' +
-                ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">' +
-                '&lt;wp:extent cx="685800" cy="514350"/>' +
-                '&lt;wp:effectExtent l="0" t="0" r="0" b="0"/>' +
-                '&lt;wp:docPr id="9999" name="Muzalife Watermark"/>' +
-                '&lt;wp:cNvGraphicFramePr>' +
-                  '&lt;a:graphicFrameLocks' +
-                    ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
-                    ' noChangeAspect="1"/>' +
-                '&lt;/wp:cNvGraphicFramePr>' +
-                '&lt;a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
-                  '&lt;a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
-                    '&lt;pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
-                      '&lt;pic:nvPicPr>' +
-                        '&lt;pic:cNvPr id="9998" name="Muzalife Watermark"/>' +
-                        '&lt;pic:cNvPicPr/>' +
-                      '&lt;/pic:nvPicPr>' +
-                      '&lt;pic:blipFill>' +
-                        '&lt;a:blip r:embed="rIdMZWM"' +
-                          ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>' +
-                        '&lt;a:stretch>&lt;a:fillRect/>&lt;/a:stretch>' +
-                      '&lt;/pic:blipFill>' +
-                      '&lt;pic:spPr>' +
-                        '&lt;a:xfrm>' +
-                          '&lt;a:off x="0" y="0"/>' +
-                          '&lt;a:ext cx="685800" cy="514350"/>' +
-                        '&lt;/a:xfrm>' +
-                        '&lt;a:prstGeom prst="rect">&lt;a:avLst/>&lt;/a:prstGeom>' +
-                      '&lt;/pic:spPr>' +
-                    '&lt;/pic:pic>' +
-                  '&lt;/a:graphicData>' +
-                '&lt;/a:graphic>' +
-              '&lt;/wp:inline>' +
-            '&lt;/w:drawing>' +
-          '&lt;/w:r>' +
-        '&lt;/w:p>';
-      doc = doc.replace('&lt;/w:body>', `${wmParagraph  }&lt;/w:body>`);
-      zip.updateFile('word/document.xml', Buffer.from(doc, 'utf8'));
+
+    // Remove old inline watermark paragraph inserted by previous runs.
+    doc = doc.replace(/&lt;w:p>(?:(?!&lt;w:p>)[\s\S])*?rIdMZWM[\s\S]*?&lt;\/w:p>/g, '');
+
+    // Inject &lt;w:headerReference> so the header is linked to the document.
+    if (!doc.includes('rIdHdr1')) {
+      const ref = '&lt;w:headerReference w:type="default" r:id="rIdHdr1"/>';
+      if (doc.includes('&lt;w:sectPr/>')) {
+        // Self-closing sectPr — expand it.
+        doc = doc.replace('&lt;w:sectPr/>', `&lt;w:sectPr>${ref}&lt;/w:sectPr>`);
+      } else if (doc.includes('&lt;w:sectPr')) {
+        // Inject as first child of existing sectPr.
+        doc = doc.replace(/(&lt;w:sectPr(?:\s[^>]*)?>)/, `$1${ref}`);
+      } else {
+        // No sectPr — create a minimal one before &lt;/w:body>.
+        doc = doc.replace('&lt;/w:body>', `&lt;w:sectPr>${ref}&lt;/w:sectPr>&lt;/w:body>`);
+      }
     }
+
+    zip.updateFile('word/document.xml', Buffer.from(doc, 'utf8'));
   }
 
   zip.writeZip(filePath);
@@ -231,7 +293,31 @@ async function watermarkDocx(filePath) {
  * @returns {Promise&lt;void>}
  */
 async function watermarkPptx(filePath) {
+  const logoMeta  = await sharp(LOGO_PATH).metadata();
+  const pptxCx    = 914400; // 1 inch
+  const pptxCy    = Math.round(pptxCx * (logoMeta.height / logoMeta.width));
+
   const zip = new AdmZip(filePath);
+
+  // Read actual slide dimensions from ppt/presentation.xml so the watermark
+  // is positioned inside the slide regardless of 4:3 / 16:9 / custom sizes.
+  // Use two separate searches so attribute order (cx/cy) doesn't matter.
+  let slideCx = 9144000; // default: 4:3 standard (10 × 7.5 inches)
+  let slideCy = 6858000;
+  const presEntry = zip.getEntry('ppt/presentation.xml');
+  if (presEntry) {
+    const presXml = presEntry.getData().toString('utf8');
+    const cxM = presXml.match(/&lt;p:sldSz\b[^>]*\bcx="(\d+)"/);
+    const cyM = presXml.match(/&lt;p:sldSz\b[^>]*\bcy="(\d+)"/);
+    if (cxM) { slideCx = parseInt(cxM[1], 10); }
+    if (cyM) { slideCy = parseInt(cyM[1], 10); }
+  }
+
+  logger.debug('watermarkPptx dimensions', { slideCx, slideCy, pptxCx, pptxCy });
+
+  const margin  = 228600; // 0.25 inch padding from slide edge
+  const offX    = slideCx - pptxCx - margin;
+  const offY    = slideCy - pptxCy - margin;
 
   // 1. Embed logo
   const logoBytes = fs.readFileSync(LOGO_PATH);
@@ -263,8 +349,8 @@ async function watermarkPptx(filePath) {
       '&lt;/p:blipFill>' +
       '&lt;p:spPr>' +
         '&lt;a:xfrm>' +
-          '&lt;a:off x="8229600" y="6172200"/>' +
-          '&lt;a:ext cx="685800" cy="514350"/>' +
+          `&lt;a:off x="${offX}" y="${offY}"/>` +
+          `&lt;a:ext cx="${pptxCx}" cy="${pptxCy}"/>` +
         '&lt;/a:xfrm>' +
         '&lt;a:prstGeom prst="rect">&lt;a:avLst/>&lt;/a:prstGeom>' +
       '&lt;/p:spPr>' +
@@ -286,7 +372,7 @@ async function watermarkPptx(filePath) {
       zip.updateFile(entry.entryName, Buffer.from(slide, 'utf8'));
     }
 
-    // Inject relationship into slide rels
+    // Inject relationship into slide rels (create the file if it doesn't exist).
     const relsName = entry.entryName.replace(
       /^ppt\/slides\/(slide\d+\.xml)$/,
       'ppt/slides/_rels/$1.rels',
@@ -295,9 +381,13 @@ async function watermarkPptx(filePath) {
     if (relsEntry) {
       let rels = relsEntry.getData().toString('utf8');
       if (!rels.includes('rIdMZWM')) {
-        rels = rels.replace('&lt;/Relationships>', `${relEntry  }&lt;/Relationships>`);
+        rels = rels.replace('&lt;/Relationships>', `${relEntry}&lt;/Relationships>`);
         zip.updateFile(relsName, Buffer.from(rels, 'utf8'));
       }
+    } else {
+      const newRels =
+        `&lt;?xml version="1.0" encoding="UTF-8" standalone="yes"?>&lt;Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relEntry}&lt;/Relationships>`;
+      zip.addFile(relsName, Buffer.from(newRels, 'utf8'));
     }
   }
 
@@ -399,6 +489,8 @@ async function watermarkRar(filePath) {
  * @returns {Promise&lt;void>}
  */
 export async function applyWatermark(filePath, mimetype) {
+  logger.debug('applyWatermark called', { filePath, mimetype });
+
   if (IMAGE_MIMES.has(mimetype)) {
     await watermarkImage(filePath);
   } else if (mimetype === 'application/pdf') {
@@ -414,14 +506,20 @@ export async function applyWatermark(filePath, mimetype) {
     await watermarkDocx(filePath);
   } else if (mimetype.includes('presentationml.presentation')) {
     await watermarkPptx(filePath);
-  } else if (mimetype === 'application/octet-stream') {
+  } else {
+    // Fallback: dispatch by file extension for MIME types that vary by OS/browser
+    // (e.g. application/vnd.ms-powerpoint sent for .pptx on some Windows clients,
+    // application/msword sent for .docx, application/octet-stream as a catch-all).
     const ext = path.extname(filePath).toLowerCase();
-    if (ext === '.rar')                      { await watermarkRar(filePath); }
-    else if (ext === '.zip')                 { await watermarkZip(filePath); }
-    else if (ext === '.pdf')                 { await watermarkPdf(filePath); }
-    else if (ext === '.docx')                { await watermarkDocx(filePath); }
-    else if (ext === '.pptx')                { await watermarkPptx(filePath); }
+    if (ext === '.rar')                                   { await watermarkRar(filePath); }
+    else if (ext === '.zip')                              { await watermarkZip(filePath); }
+    else if (ext === '.pdf')                              { await watermarkPdf(filePath); }
+    else if (ext === '.docx')                             { await watermarkDocx(filePath); }
+    else if (ext === '.pptx')                             { await watermarkPptx(filePath); }
     else if (ext === '.jpg' || ext === '.jpeg' || ext === '.png') { await watermarkImage(filePath); }
+    else {
+      logger.debug('applyWatermark: no handler for type', { mimetype, ext });
+    }
   }
 }
 </code></pre>
