@@ -264,7 +264,6 @@ Open the following endpoints to confirm everything works:
 │   ├── logger.js      # Winston logger wrapper
 │   ├── urlHelper.js   # Relative → absolute URL construction
 │   └── watermark.js   # File watermarking (PDF, DOCX, PPTX, images)
-├── .claude/           # Claude Code project context files
 └── server.js          # Application entry point
 ```
 

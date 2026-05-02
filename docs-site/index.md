@@ -80,6 +80,5 @@ MuzaLife Backend/
 │   ├── scripts/      — shell-скрипти (backup, start-dev)
 │   └── i18n/         — документація двома мовами
 ├── docs-site/        — цей VitePress сайт
-├── tests/docs/       — living documentation тести
-└── .claude/          — контекстні файли Claude Code
+└── tests/docs/       — living documentation тести
 ```
