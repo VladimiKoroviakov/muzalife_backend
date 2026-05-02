@@ -115,6 +115,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 // ── Request logging (replaces the old console.log debug middleware) ───────────
 // Attaches req.requestId (UUID) and logs every request/response pair.
@@ -166,82 +167,119 @@ app.get('/api/info', (req, res) => {
   res.json({
     name: 'Muza Life Backend API',
     version: '1.0.0',
-    description: 'Muza Life backend for authentication, user management, products, reviews, polls, FAQs, analytics, personal orders.',
+    description: 'Muza Life backend for authentication, user management, products, reviews, polls, FAQs, analytics, personal orders, payments, and admin tools.',
     endpoints: {
       auth: {
-        register: 'POST /api/auth/register',
+        registerInitiate: 'POST /api/auth/register/initiate',
+        registerVerify: 'POST /api/auth/register/verify',
+        registerResend: 'POST /api/auth/register/resend-code',
         login: 'POST /api/auth/login',
         google: 'POST /api/auth/google',
         facebook: 'POST /api/auth/facebook',
+        guestVerifyInitiate: 'POST /api/auth/guest/verify/initiate',
+        guestVerifyConfirm: 'POST /api/auth/guest/verify/confirm',
+        guestVerifyResend: 'POST /api/auth/guest/verify/resend',
       },
       users: {
-        getAllUsers: 'GET /api/users (admin only)',
-        getUserById: 'GET /api/users/:id (protected)',
-        updateUser: 'PUT /api/users/:id (protected)',
-        deleteUser: 'DELETE /api/users/:id (admin only)',
-        profile: 'GET /api/users/profile (protected)',
+        getProfile: 'GET /api/users/profile (authenticated)',
+        updateName: 'PUT /api/users/profile/name (authenticated)',
+        changePassword: 'POST /api/users/change-password (authenticated)',
+        uploadProfileImage: 'POST /api/users/profile/image (authenticated)',
+        deleteProfileImage: 'DELETE /api/users/profile/image (authenticated)',
+        deleteAccount: 'DELETE /api/users/account (authenticated)',
+        emailChangeInitiate: 'POST /api/users/email/change/initiate (authenticated)',
+        emailChangeVerify: 'POST /api/users/email/change/verify (authenticated)',
+        emailChangeResend: 'POST /api/users/email/change/resend-code (authenticated)',
       },
       products: {
-        getAllProducts: 'GET /api/products',
-        getProductById: 'GET /api/products/:id',
-        createProduct: 'POST /api/products (protected)',
-        updateProduct: 'PUT /api/products/:id (protected)',
-        deleteProduct: 'DELETE /api/products/:id (protected)',
+        getAll: 'GET /api/products',
+        getById: 'GET /api/products/:id',
+        getFiles: 'GET /api/products/:id/files (authenticated)',
+        create: 'POST /api/products (admin)',
+        update: 'PUT /api/products/:id (admin)',
+        delete: 'DELETE /api/products/:id (admin)',
       },
       metadata: {
-        getProductTypes: 'GET /api/metadata/product-types',
+        getTypes: 'GET /api/metadata/types',
         getAgeCategories: 'GET /api/metadata/age-categories',
         getEvents: 'GET /api/metadata/events',
       },
       savedProducts: {
-        getSavedProducts: 'GET /api/saved-products (protected)',
-        getSavedProductIds: 'GET /api/saved-products/ids (protected)',
-        saveProduct: 'POST /api/saved-products (protected)',
-        unsaveProduct: 'DELETE /api/saved-products/:productId (protected)',
-        checkSaved: 'GET /api/saved-products/check/:productId (protected)'
+        getIds: 'GET /api/saved-products/ids (authenticated)',
+        save: 'POST /api/saved-products (authenticated)',
+        unsave: 'DELETE /api/saved-products/:productId (authenticated)',
       },
       boughtProducts: {
-        getBoughtProducts: 'GET /api/bought-products (protected)',
-        addBoughtProduct: 'POST /api/bought-products (protected)',
-        removeBoughtProduct: 'DELETE /api/bought-products/:productId (protected)'
+        getAll: 'GET /api/bought-products (authenticated)',
+        add: 'POST /api/bought-products (authenticated)',
+        sendMaterials: 'POST /api/bought-products/:productId/send-materials (authenticated)',
+        remove: 'DELETE /api/bought-products/:productId (authenticated)',
+      },
+      personalOrders: {
+        getOwn: 'GET /api/personal-orders (authenticated)',
+        getAll: 'GET /api/personal-orders/all (admin)',
+        create: 'POST /api/personal-orders (authenticated)',
+        getById: 'GET /api/personal-orders/:orderId (authenticated)',
+        update: 'PUT /api/personal-orders/:orderId (authenticated)',
+        delete: 'DELETE /api/personal-orders/:orderId (authenticated)',
+        getFiles: 'GET /api/personal-orders/:orderId/files (admin)',
+        uploadFiles: 'POST /api/personal-orders/:orderId/files (admin)',
+        sendMaterials: 'POST /api/personal-orders/:orderId/send-materials (admin)',
+        deleteFile: 'DELETE /api/personal-orders/:orderId/files/:fileId (admin)',
       },
       reviews: {
-        getAllReviews: 'GET /api/reviews',
-        getProductReviews: 'GET /api/reviews/product/:productId',
-        getUserReviews: 'GET /api/reviews/user/:userId (protected)',
-        createReview: 'POST /api/reviews (protected)',
-        updateReview: 'PUT /api/reviews/:id (protected)',
-        deleteReview: 'DELETE /api/reviews/:id (protected)'
+        getByProduct: 'GET /api/reviews/product/:productId',
+        getByUser: 'GET /api/reviews/user/:userId',
+        create: 'POST /api/reviews (authenticated)',
+        delete: 'DELETE /api/reviews/:reviewId (authenticated)',
       },
       faqs: {
         getAll: 'GET /api/faqs',
         getById: 'GET /api/faqs/:id',
-        create: 'POST /api/faqs (protected)',
-        update: 'PUT /api/faqs/:id (protected)',
-        delete: 'DELETE /api/faqs/:id (protected)',
+        create: 'POST /api/faqs (admin)',
+        update: 'PUT /api/faqs/:id (admin)',
+        delete: 'DELETE /api/faqs/:id (admin)',
       },
       polls: {
-        getAllPolls: 'GET /api/polls',
-        getPoll: 'GET /api/polls/:pollId (protected)',
-        createPoll: 'POST /api/polls (admin only)',
-        vote: 'POST /api/polls/:pollId/vote (protected)',
-        getResults: 'GET /api/polls/:pollId/results',
-        updateStatus: 'PUT /api/polls/:pollId/status (admin only)'
-      },
-      personalOrders: {
-        getOrders: 'GET /api/personal-orders (protected)',
-        createOrder: 'POST /api/personal-orders (protected)',
-        updateOrder: 'PUT /api/personal-orders/:orderId (protected)',
-        deleteOrder: 'DELETE /api/personal-orders/:orderId (protected)'
+        getAll: 'GET /api/polls (authenticated)',
+        getById: 'GET /api/polls/:pollId (authenticated)',
+        getAdminResults: 'GET /api/polls/results (admin)',
+        getPollResults: 'GET /api/polls/:pollId/results',
+        create: 'POST /api/polls (admin)',
+        vote: 'POST /api/polls/:pollId/vote (authenticated)',
+        updateStatus: 'PUT /api/polls/:pollId/status (admin)',
+        delete: 'DELETE /api/polls/:pollId (admin)',
       },
       analytics: {
-        getStats: 'GET /api/analytics/stats/:productId (admin only)',
+        getStatsByProduct: 'GET /api/analytics/stats/:productId (admin)',
+        getProductsStats: 'GET /api/analytics/products (admin)',
+      },
+      payments: {
+        initiateProduct: 'POST /api/payments/product/:productId/initiate (authenticated)',
+        initiateOrder: 'POST /api/payments/order/:orderId/initiate (authenticated)',
+        initiateCart: 'POST /api/payments/cart/initiate (authenticated or guest)',
+        verify: 'POST /api/payments/verify (authenticated or guest)',
+        result: 'POST /api/payments/result (public — LiqPay callback)',
+        resultRedirect: 'GET /api/payments/result (public)',
+        callback: 'POST /api/payments/callback (public — signature-verified)',
+      },
+      admin: {
+        facebookPost: 'POST /api/admin/facebook/post (admin)',
+      },
+      apm: {
+        getStats: 'GET /api/apm/stats',
+        health: 'GET /api/apm/health',
+        reset: 'POST /api/apm/reset',
+      },
+      clientErrors: {
+        report: 'POST /api/errors/client',
       },
       system: {
         health: 'GET /api/health',
         database: 'GET /api/test-db',
-        info: 'GET /api/info'
-      }
+        info: 'GET /api/info',
+        swagger: 'GET /api/docs',
+      },
     },
     staticFiles: {
       uploads: 'GET /uploads/products/{productId}/{filename}'
