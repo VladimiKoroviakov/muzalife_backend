@@ -62,10 +62,11 @@ export function createPaymentData({ orderId, amount, currency = 'UAH', descripti
     description,
     order_id: orderId,
     sandbox: NODE_ENV !== 'production' ? 1 : 0,
-    // server_url is only sent in production — localhost is unreachable from
-    // LiqPay's servers and causes the sandbox checkout to return 403.
-    // In development the frontend's /payments/verify fallback handles confirmation.
-    ...(NODE_ENV === 'production' && {
+    // server_url is only sent when LIQPAY_WEBHOOK_ENABLED=true (ngrok or production).
+    // In plain localhost dev omit it — LiqPay cannot reach 127.0.0.1 and returns
+    // 403 on sandbox checkout. Set the flag together with an ngrok BACKEND_URL to
+    // receive real signed webhooks locally; the /verify fallback handles dev instead.
+    ...(process.env.LIQPAY_WEBHOOK_ENABLED === 'true' && {
       server_url: `${BACKEND_URL}/api/payments/callback`,
     }),
     result_url: `${BACKEND_URL}/api/payments/result`,

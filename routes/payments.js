@@ -301,6 +301,9 @@ router.post('/cart/initiate', authenticateAnyToken, async (req, res, next) => {
  * @throws {ForbiddenError}  403 - `orderId` encodes a different user's ID.
  */
 router.post('/verify', authenticateAnyToken, async (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
   try {
     const userId = req.userId;
     const guestEmail = req.guestEmail;
