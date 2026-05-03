@@ -40,7 +40,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: './docs/coverage',
-      include: ['utils/**', 'services/**', 'middleware/**', 'config/**'],
+      include: ['utils/**', 'services/**', 'middleware/**', 'config/**', 'routes/**', 'controllers/**'],
       exclude: ['node_modules/**', 'docs/**'],
     },
 

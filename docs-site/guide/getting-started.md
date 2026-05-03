@@ -117,8 +117,17 @@ npm start
 # Згенерувати JSDoc HTML → docs/jsdoc/
 npm run docs
 
-# Запустити живі тести-документацію
+# Запустити всі тести
+npm test
+
+# Запустити лише living-documentation тести
 npm run test:docs
+
+# Запустити unit-тести (middleware, утиліти, обробка помилок)
+npm run test:unit
+
+# Запустити HTTP-інтеграційні тести маршрутів
+npm run test:routes
 
 # Відкрити VitePress docs site локально
 npm run docs:site

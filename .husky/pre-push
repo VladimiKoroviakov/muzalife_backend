@@ -2,13 +2,13 @@
 # .husky/pre-push
 #
 # Runs before every `git push`.
-# Ensures living-documentation tests pass and JSDoc can be generated
+# Ensures all tests pass and JSDoc can be generated
 # before code is pushed to the remote.
 #
 # Skip with: git push --no-verify  (not recommended)
 
-echo "🔬 Running living-documentation tests..."
-npm run test:docs
+echo "🔬 Running all tests (docs, unit, routes)..."
+npm test
 
 echo "📖 Verifying JSDoc generation..."
 npm run docs --silent

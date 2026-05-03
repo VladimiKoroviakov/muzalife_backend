@@ -255,7 +255,10 @@ Open the following endpoints to confirm everything works:
 │   └── setupDatabase.js    # DB schema initialisation
 ├── services/          # External integrations (email, OAuth, payments)
 ├── tests/
-│   └── docs/          # Living-documentation tests (Vitest)
+│   ├── docs/          # Living-documentation tests (Vitest)
+│   ├── unit/          # Unit tests for utils, middleware, error handling
+│   ├── routes/        # HTTP-level route tests (supertest + mocked DB)
+│   └── helpers/       # Shared test factories (makeToken, makeApp)
 ├── uploads/           # User-uploaded files (not committed to git)
 ├── utils/
 │   ├── AppError.js    # Custom error classes (400–502)
@@ -277,6 +280,8 @@ Open the following endpoints to confirm everything works:
 | `npm run setup-db` | Create all database tables and indexes |
 | `npm test` | Run all Vitest tests |
 | `npm run test:docs` | Run living-documentation tests only (`tests/docs/`) |
+| `npm run test:unit` | Run unit tests only (`tests/unit/`) |
+| `npm run test:routes` | Run route integration tests only (`tests/routes/`) |
 | `npm run test:coverage` | Run tests with v8 coverage report |
 | `npm run lint` | Run ESLint check |
 | `npm run lint:fix` | Run ESLint with auto-fix |

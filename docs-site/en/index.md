@@ -33,8 +33,8 @@ features:
     title: JSDoc Reference
     details: Auto-generated HTML documentation for all backend modules.
   - icon: 🔬
-    title: Living Documentation Tests
-    details: Every public function has a corresponding test in tests/docs/ that serves as an executable specification.
+    title: Comprehensive Test Suite
+    details: 200+ tests across three layers — living-documentation specs (tests/docs/), unit tests for middleware and utilities (tests/unit/), and HTTP integration tests for routes with a mocked database (tests/routes/).
 ---
 
 ## Quick Start
@@ -80,5 +80,9 @@ MuzaLife Backend/
 │   ├── scripts/      — shell scripts (backup, start-dev)
 │   └── i18n/         — bilingual documentation
 ├── docs-site/        — this VitePress site
-└── tests/docs/       — living documentation tests
+└── tests/
+    ├── docs/         — living documentation tests
+    ├── unit/         — unit tests for middleware and utilities
+    ├── routes/       — HTTP integration tests for routes
+    └── helpers/      — shared token and app factories
 ```

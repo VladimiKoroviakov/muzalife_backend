@@ -8,6 +8,8 @@
     "setup-db": "node scripts/setupDatabase.js",
     "test": "vitest run",
     "test:docs": "vitest run tests/docs/",
+    "test:unit": "vitest run tests/unit/",
+    "test:routes": "vitest run tests/routes/",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
@@ -58,6 +60,7 @@
     "jsdoc": "^4.0.5",
     "lint-staged": "^15.0.0",
     "nodemon": "^3.1.10",
+    "supertest": "^7.2.2",
     "vitepress": "^1.6.4",
     "vitest": "^2.1.0"
   }

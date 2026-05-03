@@ -33,8 +33,8 @@ features:
     title: JSDoc довідник
     details: Автоматично згенерована HTML документація для всіх модулів backend.
   - icon: 🔬
-    title: Живі тести-документація
-    details: Кожна публічна функція має відповідний тест у tests/docs/, що служить виконуваною специфікацією.
+    title: Комплексне тестування
+    details: 200+ тестів у трьох рівнях — living-documentation (tests/docs/), unit-тести middleware та утиліт (tests/unit/), HTTP-інтеграційні тести маршрутів із мок-базою даних (tests/routes/).
 ---
 
 ## Швидкий старт
@@ -80,5 +80,9 @@ MuzaLife Backend/
 │   ├── scripts/      — shell-скрипти (backup, start-dev)
 │   └── i18n/         — документація двома мовами
 ├── docs-site/        — цей VitePress сайт
-└── tests/docs/       — living documentation тести
+└── tests/
+    ├── docs/         — living documentation тести
+    ├── unit/         — unit-тести middleware та утиліт
+    ├── routes/       — HTTP-інтеграційні тести маршрутів
+    └── helpers/      — спільні фабрики токенів та застосунку
 ```

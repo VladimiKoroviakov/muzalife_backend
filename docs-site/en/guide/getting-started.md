@@ -115,7 +115,10 @@ Expected startup output:
 
 ```bash
 npm run docs          # generate JSDoc HTML → docs/jsdoc/
-npm run test:docs     # run living-documentation tests
+npm test              # run all tests (208 tests across 11 files)
+npm run test:docs     # run living-documentation tests only
+npm run test:unit     # run unit tests (middleware, utils, error handling)
+npm run test:routes   # run HTTP integration tests for routes
 npm run docs:site     # serve VitePress docs locally
 npm run docs:archive  # create docs/jsdoc.zip
 
