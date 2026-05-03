@@ -143,7 +143,11 @@ describe('POST /api/reviews — requires authentication', () => {
     vi.clearAllMocks();
     db.connect.mockResolvedValue(mockClient);
     mockClient.query.mockReset();
+    // Ensure any unmocked call (e.g. ROLLBACK in error paths) returns a
+    // resolved Promise rather than undefined, preventing response hangs.
+    mockClient.query.mockResolvedValue({});
     mockClient.release.mockReset();
+    mockClient.release.mockResolvedValue(undefined);
   });
 
   it('responds 401 when no Authorization header is provided', async () => {
