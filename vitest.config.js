@@ -20,6 +20,8 @@ export default defineConfig({
     env: {
       JWT_SECRET: 'test-secret-for-living-docs',
       JWT_EXPIRES_IN: '1h',
+      FACEBOOK_APP_ID: 'test-fb-app-id',
+      FACEBOOK_APP_SECRET: 'test-fb-app-secret',
     },
 
     // Use Node environment (no DOM)

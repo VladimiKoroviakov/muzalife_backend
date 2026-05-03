@@ -294,7 +294,10 @@ Uploads directory created: .../uploads/products
 │   └── setupDatabase.js    # DB schema initialisation
 ├── services/          # External integrations (email, OAuth, payments)
 ├── tests/
-│   └── docs/          # Living-documentation tests (Vitest)
+│   ├── docs/          # Living-documentation tests (Vitest)
+│   ├── unit/          # Unit tests for utils, middleware, error handling
+│   ├── routes/        # HTTP-level route tests (supertest + mocked DB)
+│   └── helpers/       # Shared test factories (makeToken, makeApp)
 ├── uploads/           # User-uploaded files (not committed to git)
 ├── utils/
 │   ├── AppError.js    # Custom error classes (400–502)
@@ -333,6 +336,14 @@ Uploads directory created: .../uploads/products
 <tr>
 <td><code>npm run test:docs</code></td>
 <td>Run living-documentation tests only (<code>tests/docs/</code>)</td>
+</tr>
+<tr>
+<td><code>npm run test:unit</code></td>
+<td>Run unit tests only (<code>tests/unit/</code>)</td>
+</tr>
+<tr>
+<td><code>npm run test:routes</code></td>
+<td>Run route integration tests only (<code>tests/routes/</code>)</td>
 </tr>
 <tr>
 <td><code>npm run test:coverage</code></td>

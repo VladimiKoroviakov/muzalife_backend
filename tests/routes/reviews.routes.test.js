@@ -5,7 +5,7 @@
  *   GET  /api/reviews/product/:productId  — public
  *   GET  /api/reviews/user/:userId        — public
  *   POST /api/reviews                     — auth required
- *   DELETE /api/reviews/:reviewId         — auth required (KNOWN BUG documented)
+ *   DELETE /api/reviews/:reviewId         — auth required
  *
  * The reviews controller uses the **default pool import** (`pool.query` and
  * `pool.connect()`). The DB mock exposes both so the controller can use them.
@@ -295,18 +295,29 @@ describe('DELETE /api/reviews/:reviewId — requires authentication', () => {
     expect(res.status).toBe(403);
   });
 
-  /**
-   * KNOWN BUG: `deleteReview` in `controllers/reviewsController.js` line 286
-   * reads `req.user.userId` but the auth middleware sets `req.userId`.
-   * This causes a TypeError on every authenticated DELETE request.
-   * Fix: change `req.user.userId` to `req.userId`.
-   */
-  it('KNOWN BUG: responds 500 due to TypeError reading req.user.userId (should be req.userId)', async () => {
+  it('responds 400 when reviewId is not a number', async () => {
+    const res = await request(app)
+      .delete('/api/reviews/abc')
+      .set('Authorization', `Bearer ${validToken}`);
+    expect(res.status).toBe(400);
+  });
+
+  it('responds 404 when the review is not found or does not belong to the user', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
     const res = await request(app)
       .delete('/api/reviews/1')
       .set('Authorization', `Bearer ${validToken}`);
+    expect(res.status).toBe(404);
+  });
 
-    // This will be 500 until the bug is fixed in reviewsController.js:286
-    expect(res.status).toBe(500);
+  it('responds 200 when the review is successfully deleted', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ product_id: 5 }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const res = await request(app)
+      .delete('/api/reviews/1')
+      .set('Authorization', `Bearer ${validToken}`);
+    expect(res.status).toBe(200);
   });
 });

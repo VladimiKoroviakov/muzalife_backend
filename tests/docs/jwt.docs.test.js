@@ -92,12 +92,10 @@ describe('verifyToken(token)', () => {
     expect(() => verifyToken(tampered)).toThrow();
   });
 
-  it('throws JsonWebTokenError for a token signed with a different secret', () => {
-    // Manually craft a token with a different secret
-    import('jsonwebtoken').then(({ default: jwt }) => {
-      const foreign = jwt.sign({ userId: 1 }, 'wrong-secret');
-      expect(() => verifyToken(foreign)).toThrow();
-    });
+  it('throws JsonWebTokenError for a token signed with a different secret', async () => {
+    const { default: jwt } = await import('jsonwebtoken');
+    const foreign = jwt.sign({ userId: 1 }, 'wrong-secret');
+    expect(() => verifyToken(foreign)).toThrow();
   });
 
   it('round-trips: generate then verify returns the original userId', () => {

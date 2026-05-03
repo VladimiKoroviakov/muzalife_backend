@@ -283,7 +283,7 @@ export const submitReview = async (req, res) => {
 // DELETE /api/reviews/:reviewId - Delete a review
 export const deleteReview = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.userId;
     const reviewId = parseInt(req.params.reviewId);
 
     if (isNaN(reviewId)) {

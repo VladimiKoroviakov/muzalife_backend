@@ -31,3 +31,6 @@ certs/
 # Generated files
 CLAUDE.md
 .claude/
+
+# Vitest internal cache files
+vitest.config.js.timestamp-*.mjs
