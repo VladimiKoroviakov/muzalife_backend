@@ -22,6 +22,10 @@ export default defineConfig({
       JWT_EXPIRES_IN: '1h',
       FACEBOOK_APP_ID: 'test-fb-app-id',
       FACEBOOK_APP_SECRET: 'test-fb-app-secret',
+      FRONTEND_URL: 'http://localhost:3000',
+      BACKEND_URL: 'http://localhost:5001',
+      LIQPAY_PUBLIC_KEY: 'sandbox_test_public',
+      LIQPAY_PRIVATE_KEY: 'sandbox_test_private',
     },
 
     // Use Node environment (no DOM)
@@ -45,6 +49,9 @@ export default defineConfig({
       include: ['utils/**', 'services/**', 'middleware/**', 'config/**', 'routes/**', 'controllers/**'],
       exclude: ['node_modules/**', 'docs/**'],
     },
+
+    // Global setup — mocks logger before any test module loads
+    setupFiles: ['./tests/setup.js'],
 
     // Test timeout (ms)
     testTimeout: 10000,
