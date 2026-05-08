@@ -27,7 +27,7 @@
     <section>
         <article>
             <pre class="prettyprint source linenums"><code>/**
- * @fileoverview PostgreSQL database connection pool configuration.
+ * @file PostgreSQL database connection pool configuration.
  *
  * This module creates and exports a shared PostgreSQL connection pool used
  * throughout the application. All database credentials are loaded from
@@ -36,7 +36,6 @@
  * **Architectural decision:** a single shared pool is used (singleton pattern)
  * to limit the total number of open connections and avoid connection exhaustion
  * under high concurrency.
- *
  * @module config/database
  * @see {@link https://node-postgres.com/apis/pool|node-postgres Pool docs}
  */
@@ -54,14 +53,13 @@ dotenv.config();
  * The pool automatically manages a set of reusable database connections.
  * Connection limits and idle timeouts are governed by `pg` defaults unless
  * explicitly overridden via environment variables.
- *
- * @type {Object}
+ * @type {object}
  */
 const pool = new Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
   database: process.env.DB_NAME || 'muzalife',
-  password: process.env.DB_PASSWORD || 'password',
+  password: process.env.DB_PASSWORD,
   port: process.env.DB_PORT || 5433,
 });
 
@@ -84,13 +82,11 @@ pool.on('error', (err) => {
  * This is the primary way every module in the application talks to the
  * database. Parameterised queries (`$1`, `$2`, …) are used exclusively to
  * prevent SQL-injection attacks.
- *
  * @param {string} text     - The SQL statement, e.g. `'SELECT * FROM users WHERE id = $1'`.
  * @param {Array}  [params] - Optional array of parameter values bound to the
  *                            placeholders in `text`.
- * @returns {Promise&lt;Object>} Resolves with the `pg` QueryResult
+ * @returns {Promise&lt;object>} Resolves with the `pg` QueryResult
  *   object which exposes `rows`, `rowCount`, `fields`, etc.
- *
  * @example
  * import { query } from './config/database.js';
  *
